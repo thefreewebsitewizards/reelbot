@@ -1,0 +1,1 @@
+Openclaw has a secret app and nobody's told you about it. Here's what it is. So it's Openclaw Studio and this is a beautiful clean web dashboard that allows you to use Openclaw valley terminals, valley config files, just a clean interface where you can manage your agents, connect your gateway and actually see what's going on directly inside Openclaw.

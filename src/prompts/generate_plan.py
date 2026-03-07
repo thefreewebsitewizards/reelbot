@@ -36,14 +36,22 @@ USER_TEMPLATE = """Convert this reel analysis into an implementation plan.
 
 **Source Reel:** {url} (by {creator})
 **Category:** {category}
+**Theme:** {theme}
 **Summary:** {summary}
+**Business Impact:** {business_impact}
 **Relevance:** {relevance_score}
 
 **Key Insights:**
 {insights_formatted}
 
+**Business Applications:**
+{applications_formatted}
+
 **Swipe Phrases (ready-to-use copy from the reel):**
 {phrases_formatted}
+
+**Fact Checks:**
+{fact_checks_formatted}
 
 Return JSON:
 {{
@@ -57,7 +65,9 @@ Return JSON:
       "estimated_hours": 1.0,
       "deliverables": ["Concrete output — for copy deliverables, include the draft text"],
       "dependencies": ["Other task title if needed — state what output is used"],
-      "tools": ["n8n", "ghl", "claude_code", "meta_ads", "website"]
+      "tools": ["n8n", "ghl", "claude_code", "meta_ads", "website"],
+      "requires_human": false,
+      "human_reason": ""
     }}
   ]
 }}
@@ -71,12 +81,19 @@ Rules:
 - Tasks that involve copy/messaging MUST include the actual draft text, not just "write copy"
 - Incorporate the swipe phrases directly into task descriptions and deliverables
 - If a task requires data we don't have yet, create a preceding task to gather it
-- Do NOT duplicate tasks that already exist in previous plans (see existing plans below)"""
+- Do NOT duplicate tasks that already exist in previous plans (see existing plans below)
+- Set requires_human=true for tasks that need human judgment (ad spend, client outreach, content approval). Explain why in human_reason
+- If a fact check flagged something as "outdated" or "better_alternative", account for the correction in your tasks"""
 
 EXISTING_PLANS_SECTION = """
 
 **Existing plans (avoid duplicating these tasks):**
 {existing_plans}"""
+
+CAPABILITIES_SECTION = """
+
+**Existing Capabilities (DO NOT suggest rebuilding these — reference them for new use cases instead):**
+{capabilities}"""
 
 SCRIPT_CONTEXT_SECTION = """
 
@@ -97,19 +114,44 @@ def build_plan_prompt(
     existing_plans_summary: str = "",
     script_context: str = "",
     script_section_ids: str = "",
+    capabilities_context: str = "",
 ) -> tuple[str, str]:
     insights_formatted = "\n".join(f"- {i}" for i in analysis.key_insights)
     phrases_formatted = "\n".join(f"- {p}" for p in analysis.swipe_phrases) if analysis.swipe_phrases else "- None extracted"
+
+    applications_formatted = "- None identified"
+    if analysis.business_applications:
+        applications_formatted = "\n".join(
+            f"- [{ba.urgency.upper()}] {ba.area}: {ba.recommendation} (target: {ba.target_system})"
+            for ba in analysis.business_applications
+        )
+
+    fact_checks_formatted = "- No claims flagged"
+    if analysis.fact_checks:
+        fact_checks_formatted = "\n".join(
+            f"- [{fc.verdict}] \"{fc.claim}\" — {fc.explanation}"
+            + (f" Better: {fc.better_alternative}" if fc.better_alternative else "")
+            for fc in analysis.fact_checks
+        )
 
     user_prompt = USER_TEMPLATE.format(
         url=metadata.url,
         creator=metadata.creator or "Unknown",
         category=analysis.category,
+        theme=analysis.theme or "Not specified",
         summary=analysis.summary,
+        business_impact=analysis.business_impact or "Not assessed",
         relevance_score=analysis.relevance_score,
         insights_formatted=insights_formatted,
+        applications_formatted=applications_formatted,
         phrases_formatted=phrases_formatted,
+        fact_checks_formatted=fact_checks_formatted,
     )
+
+    if capabilities_context:
+        user_prompt += CAPABILITIES_SECTION.format(
+            capabilities=capabilities_context,
+        )
 
     if existing_plans_summary:
         user_prompt += EXISTING_PLANS_SECTION.format(

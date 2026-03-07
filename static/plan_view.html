@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>{{title}}</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    background: #0f172a; color: #e2e8f0;
+    line-height: 1.6; padding: 16px;
+    max-width: 800px; margin: 0 auto;
+  }
+  a { color: #60a5fa; text-decoration: none; }
+  a:hover { text-decoration: underline; }
+  h1 { font-size: 1.5rem; color: #f8fafc; margin-bottom: 4px; }
+  h2 { font-size: 1.2rem; color: #f8fafc; margin-top: 32px; margin-bottom: 12px; border-bottom: 1px solid #334155; padding-bottom: 6px; }
+  h3 { font-size: 1rem; color: #f1f5f9; margin-bottom: 6px; }
+  p { margin-bottom: 8px; }
+  ul { margin: 8px 0; padding-left: 20px; }
+  li { margin-bottom: 4px; }
+  .header { margin-bottom: 24px; }
+  .theme { color: #94a3b8; font-style: italic; margin-bottom: 8px; }
+  .meta { color: #64748b; font-size: 0.85rem; margin-bottom: 8px; }
+  .badge {
+    display: inline-block; padding: 2px 8px; border-radius: 4px;
+    font-size: 0.75rem; font-weight: 600; color: #fff;
+  }
+  .relevance-badge { background: {{relevance_color}}; }
+  .impact { background: #1e293b; border-left: 3px solid #3b82f6; padding: 12px 16px; margin: 12px 0; border-radius: 4px; }
+  .card {
+    background: #1e293b; border-radius: 6px; padding: 12px 16px;
+    margin-bottom: 8px;
+  }
+  .card p { margin: 4px 0 0 0; color: #cbd5e1; }
+  .quote {
+    background: #1e293b; border-left: 3px solid #a78bfa; padding: 10px 16px;
+    margin-bottom: 8px; border-radius: 4px; font-style: italic; color: #c4b5fd;
+  }
+  .hook {
+    background: #1e293b; border-left: 3px solid #f59e0b; padding: 10px 16px;
+    margin-bottom: 12px; border-radius: 4px; color: #fbbf24;
+  }
+  .hook strong { color: #fcd34d; }
+  .creator-ctx {
+    background: #1e293b; border-radius: 6px; padding: 10px 16px;
+    margin-bottom: 12px; color: #94a3b8; font-size: 0.9rem;
+  }
+  .point-list { list-style: none; padding-left: 0; counter-reset: points; }
+  .point-list li {
+    counter-increment: points;
+    padding: 8px 12px 8px 36px; position: relative;
+    background: #1e293b; border-radius: 4px; margin-bottom: 6px;
+  }
+  .point-list li::before {
+    content: counter(points);
+    position: absolute; left: 12px; top: 8px;
+    color: #60a5fa; font-weight: 700; font-size: 0.9rem;
+  }
+  .task {
+    background: #1e293b; border-radius: 6px; padding: 16px;
+    margin-bottom: 12px;
+  }
+  .task h3 { margin-bottom: 4px; }
+  .task-meta { color: #94a3b8; font-size: 0.85rem; margin-bottom: 8px; }
+  .task ul { margin-top: 8px; }
+  .human-note { color: #f59e0b; font-weight: 600; margin-bottom: 12px; }
+  .section-notes { background: #1e293b; border-radius: 6px; padding: 16px; margin-bottom: 12px; }
+  .section-notes p { margin-bottom: 6px; }
+  .similarity-callout {
+    background: #1e293b; border-left: 3px solid #f59e0b; padding: 12px 16px;
+    margin-bottom: 16px; border-radius: 4px; color: #fbbf24;
+  }
+  .similarity-callout strong { color: #fcd34d; }
+  .collapsible { cursor: pointer; user-select: none; }
+  .collapsible::after { content: " +"; color: #64748b; }
+  .collapsible.open::after { content: " −"; }
+  .collapsible-content { display: none; }
+  .collapsible-content.open { display: block; }
+  .action-bar { display: flex; gap: 8px; margin-bottom: 16px; flex-wrap: wrap; }
+  .action-btn {
+    padding: 8px 16px; border: none; border-radius: 6px; cursor: pointer;
+    font-weight: 600; font-size: 0.85rem; color: #fff; transition: opacity 0.2s;
+  }
+  .action-btn:hover { opacity: 0.85; }
+  .action-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+  .action-btn.approve { background: #22c55e; }
+  .action-btn.reject { background: #ef4444; }
+  .action-btn.complete { background: #3b82f6; }
+  .action-btn.back { background: #475569; }
+  .action-status { color: #94a3b8; font-size: 0.85rem; align-self: center; }
+  .badge-route { background: #0891b2; margin-left: 4px; vertical-align: middle; }
+  table th, table td { padding: 6px 10px; text-align: left; }
+  @media (max-width: 600px) {
+    body { padding: 12px; }
+    h1 { font-size: 1.25rem; }
+    .task, .card { padding: 12px; }
+  }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1>{{title}}</h1>
+  <div class="theme">{{theme}}</div>
+  <div class="meta">
+    <span class="badge relevance-badge">{{relevance_score}}</span>
+    {{category}} &middot; <a href="{{source_url}}">{{creator}}</a> &middot; {{duration}}{{routed_to_html}}
+  </div>
+</div>
+
+{{action_buttons_html}}
+
+{{similarity_html}}
+<div class="impact">{{business_impact}}</div>
+
+<p>{{summary}}</p>
+
+{{video_breakdown_html}}
+
+<h2>Key Insights</h2>
+<ul>{{insights_html}}</ul>
+
+<h2>Swipe Phrases</h2>
+<ul>{{phrases_html}}</ul>
+
+<h2 class="collapsible" onclick="toggle(this)">Our Take</h2>
+<div class="collapsible-content">
+<div class="section-notes">{{notes_html}}</div>
+</div>
+
+<h2 class="collapsible" onclick="toggle(this)">Business Applications</h2>
+<div class="collapsible-content">
+{{applications_html}}
+</div>
+
+{{fact_checks_section}}
+
+<h2 class="collapsible" onclick="toggle(this)">Implementation Tasks ({{total_hours}}h)</h2>
+<div class="collapsible-content">
+{{tasks_html}}
+</div>
+
+{{repurposing_html}}
+
+{{personal_brand_html}}
+
+{{cost_html}}
+
+<script>
+function toggle(el){
+  el.classList.toggle('open');
+  el.nextElementSibling.classList.toggle('open');
+}
+async function updateStatus(reelId, status, btn) {
+  btn.disabled = true;
+  const statusEl = document.getElementById('action-status');
+  statusEl.textContent = 'Updating...';
+  try {
+    const res = await fetch('/plans/' + reelId + '/status', {
+      method: 'PATCH',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({status: status}),
+    });
+    if (res.ok) {
+      statusEl.textContent = 'Status: ' + status;
+      document.querySelectorAll('.action-btn:not(.back)').forEach(b => b.disabled = true);
+    } else {
+      statusEl.textContent = 'Failed: ' + res.statusText;
+      btn.disabled = false;
+    }
+  } catch(e) {
+    statusEl.textContent = 'Error: ' + e.message;
+    btn.disabled = false;
+  }
+}
+</script>
+</body>
+</html>

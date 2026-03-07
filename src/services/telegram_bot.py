@@ -13,13 +13,16 @@ from telegram.ext import (
 from loguru import logger
 
 from src.config import settings
-from src.models import PipelineResult, PlanStatus
+from src.models import PipelineResult, PlanStatus, TranscriptResult, CostBreakdown
 from src.services.downloader import download_reel, extract_shortcode
 from src.services.audio import extract_audio
 from src.services.frames import extract_keyframes
 from src.services.transcriber import transcribe
-from src.services.analyzer import analyze_reel
-from src.services.planner import generate_plan
+from src.services.analyzer import analyze_reel, analyze_carousel
+from src.services.ocr import extract_text_from_images
+from src.services.planner import generate_plan, check_plan_similarity
+from src.services.repurposer import generate_repurposing_plan
+from src.services.personal_brand import generate_personal_brand_plan
 from src.utils.file_ops import create_temp_dir, cleanup_temp_dir
 from src.utils.plan_writer import write_plan
 from src.utils.plan_manager import (
@@ -36,6 +39,16 @@ INSTAGRAM_PATTERN = re.compile(r"instagram\.com/(reel|reels|p)/")
 _last_reel: dict[int, str] = {}
 # Track plan message IDs so we can detect replies to plans
 _plan_messages: dict[int, str] = {}  # message_id -> reel_id
+
+
+def _esc(text: str) -> str:
+    """Escape Telegram Markdown special characters in dynamic/LLM text."""
+    if not text:
+        return text
+    # Telegram Markdown v1 special chars: * _ ` [
+    for ch in ("*", "_", "`", "["):
+        text = text.replace(ch, "\\" + ch)
+    return text
 
 
 async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -149,7 +162,8 @@ async def cmd_plans(update: Update, context: ContextTypes.DEFAULT_TYPE):
             emoji = {"review": "📋", "approved": "✅", "in_progress": "⚡", "completed": "✔️", "failed": "❌"}
             lines.append(f"\n{emoji.get(status.value, '•')} *{status.value.upper()}* ({len(plans)})")
             for p in plans[-5:]:  # Show last 5 per status
-                lines.append(f"  `{p['reel_id']}` — {p['title'][:50]}")
+                theme_hint = f" | {p.get('theme', '')[:40]}" if p.get("theme") else ""
+                lines.append(f"  `{p['reel_id']}` — {p['title'][:50]}{theme_hint}")
 
     await update.message.reply_text("\n".join(lines), parse_mode="Markdown")
 
@@ -195,13 +209,35 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     try:
         temp_dir = create_temp_dir(reel_id)
+        costs = CostBreakdown()
 
-        video_path, metadata = download_reel(url, temp_dir)
-        audio_path = extract_audio(video_path, temp_dir)
-        frame_paths = extract_keyframes(video_path, temp_dir)
-        transcript = transcribe(audio_path)
-        analysis = analyze_reel(transcript, metadata, frame_paths)
-        plan = generate_plan(analysis, metadata)
+        download_result, metadata = download_reel(url, temp_dir)
+
+        if metadata.content_type == "carousel":
+            image_paths = download_result
+            ocr_text = extract_text_from_images(image_paths)
+            transcript = TranscriptResult(text=ocr_text, language="en")
+            analysis, analysis_cr = analyze_carousel(ocr_text, metadata, image_paths)
+        else:
+            video_path = download_result
+            audio_path = extract_audio(video_path, temp_dir)
+            frame_paths = extract_keyframes(video_path, temp_dir)
+            transcript = transcribe(audio_path)
+            analysis, analysis_cr = analyze_reel(transcript, metadata, frame_paths)
+        costs.add("analysis", analysis_cr.model, analysis_cr.prompt_tokens, analysis_cr.completion_tokens, analysis_cr.cost_usd)
+
+        similarity, sim_cr = check_plan_similarity(analysis)
+        if sim_cr:
+            costs.add("similarity", sim_cr.model, sim_cr.prompt_tokens, sim_cr.completion_tokens, sim_cr.cost_usd)
+
+        plan, plan_cr = generate_plan(analysis, metadata)
+        costs.add("plan", plan_cr.model, plan_cr.prompt_tokens, plan_cr.completion_tokens, plan_cr.cost_usd)
+
+        repurposing_plan, rep_cr = generate_repurposing_plan(analysis, metadata, transcript.text)
+        costs.add("repurposing", rep_cr.model, rep_cr.prompt_tokens, rep_cr.completion_tokens, rep_cr.cost_usd)
+
+        personal_brand_plan, pb_cr = generate_personal_brand_plan(analysis, metadata, transcript.text)
+        costs.add("personal_brand", pb_cr.model, pb_cr.prompt_tokens, pb_cr.completion_tokens, pb_cr.cost_usd)
 
         result = PipelineResult(
             reel_id=reel_id,
@@ -210,6 +246,10 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             transcript=transcript,
             analysis=analysis,
             plan=plan,
+            repurposing_plan=repurposing_plan,
+            personal_brand_plan=personal_brand_plan,
+            similarity=similarity,
+            cost_breakdown=costs,
         )
         plan_dir = write_plan(result)
         plan_md_path = plan_dir / "plan.md"
@@ -219,24 +259,83 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         # Track last reel for this chat
         _last_reel[chat_id] = reel_id
 
-        # Send short summary with inline buttons
-        task_list = "\n".join(
-            f"  {i}. [{t.priority}] {t.title} ({t.estimated_hours:.1f}h)"
-            for i, t in enumerate(plan.tasks, 1)
-        )
+        # Build Telegram summary — lead with video context
+        vb = analysis.video_breakdown
+
+        # Video breakdown section
+        video_section = ""
+        if vb.main_points:
+            points = "\n".join(f"  {i}. {_esc(p)}" for i, p in enumerate(vb.main_points, 1))
+            video_section = f"*What they talked about:*\n{points}\n\n"
+        if vb.key_quotes:
+            top_quote = vb.key_quotes[0]
+            video_section += f"_{_esc(top_quote)}_\n\n"
+
+        theme_line = f"_{_esc(analysis.theme)}_\n\n" if analysis.theme else ""
+        impact_line = f"*Why it matters:* {_esc(analysis.business_impact)}\n\n" if analysis.business_impact else ""
+
+        # Task summary (compact)
+        task_lines = []
+        for i, t in enumerate(plan.tasks, 1):
+            flag = " \\[!]" if t.requires_human else ""
+            task_lines.append(f"  {i}. {_esc(t.title)} ({t.estimated_hours:.1f}h){flag}")
+        task_list = "\n".join(task_lines)
+
+        human_count = sum(1 for t in plan.tasks if t.requires_human)
+        human_note = f"\n{human_count} task(s) need human action \\[!]" if human_count else ""
+
+        # Fact check warnings
+        fact_warnings = ""
+        flagged = [fc for fc in analysis.fact_checks if fc.verdict in ("outdated", "better_alternative")]
+        if flagged:
+            warnings = "\n".join(f"  - \\[{_esc(fc.verdict)}] {_esc(fc.claim)}" for fc in flagged)
+            fact_warnings = f"\n\n*Heads up — fact checks:*\n{warnings}"
+
+        repurposing_line = ""
+        if repurposing_plan and repurposing_plan.tasks:
+            repurposing_line = f"\nContent repurposing: {len(repurposing_plan.tasks)} tasks ({repurposing_plan.total_estimated_hours:.1f}h)"
+
+        personal_brand_line = ""
+        if personal_brand_plan and personal_brand_plan.tasks:
+            personal_brand_line = f"\nDDB personal brand: {len(personal_brand_plan.tasks)} tasks ({personal_brand_plan.total_estimated_hours:.1f}h)"
+
+        similarity_line = ""
+        if similarity and similarity.similar_plans:
+            top = similarity.similar_plans[0]
+            similarity_line = f"\n\n*Similar to:* {_esc(top.title)} ({top.score}% overlap)"
+            if similarity.recommendation == "merge":
+                similarity_line += " — consider merging tasks"
+            elif similarity.recommendation == "skip":
+                similarity_line += " — very similar, review carefully"
+
+        cost_line = ""
+        if costs.calls:
+            details = ", ".join(f"{c.step} ${c.cost_usd:.3f}" for c in costs.calls)
+            cost_line = f"\n\nEst\\. cost: ${costs.total_cost_usd:.3f} ({details})"
+
         summary = (
-            f"*{plan.title}*\n\n"
-            f"{plan.summary}\n\n"
-            f"*Tasks ({plan.total_estimated_hours:.1f}h total):*\n"
-            f"{task_list}\n\n"
-            f"Relevance: {analysis.relevance_score:.0%}"
+            f"*{_esc(plan.title)}*\n"
+            f"{_esc(metadata.creator)} · {analysis.relevance_score:.0%} relevance\n\n"
+            f"{theme_line}"
+            f"{video_section}"
+            f"{impact_line}"
+            f"*Tasks ({plan.total_estimated_hours:.1f}h):*\n"
+            f"{task_list}{human_note}{repurposing_line}{personal_brand_line}"
+            f"{fact_warnings}"
+            f"{similarity_line}"
+            f"{cost_line}"
         )
 
+        base_url = settings.public_url or f"http://{settings.host}:{settings.port}"
+        view_url = f"{base_url}/plans/{reel_id}/view"
         keyboard = InlineKeyboardMarkup([
             [
                 InlineKeyboardButton("✅ Approve", callback_data=f"approve:{reel_id}"),
                 InlineKeyboardButton("❌ Reject", callback_data=f"reject:{reel_id}"),
-            ]
+            ],
+            [
+                InlineKeyboardButton("📄 View Plan", url=view_url),
+            ],
         ])
 
         summary_msg = await update.message.reply_text(
@@ -301,7 +400,7 @@ async def _refine_plan(reel_id: str, feedback: str, update: Update):
         # Append feedback to analysis insights so the planner sees it
         analysis.key_insights.append(f"USER FEEDBACK (must incorporate): {feedback}")
 
-        plan = generate_plan(analysis, metadata)
+        plan, _ = generate_plan(analysis, metadata)
 
         # Overwrite the plan file
         from src.utils.plan_writer import write_plan_md
@@ -311,15 +410,20 @@ async def _refine_plan(reel_id: str, feedback: str, update: Update):
         chat_id = update.message.chat.id
         _last_reel[chat_id] = reel_id
 
-        task_list = "\n".join(
-            f"  {i}. [{t.priority}] {t.title} ({t.estimated_hours:.1f}h)"
-            for i, t in enumerate(plan.tasks, 1)
-        )
+        task_lines = []
+        for i, t in enumerate(plan.tasks, 1):
+            flag = " \\[!]" if t.requires_human else ""
+            task_lines.append(f"  {i}. \\[{_esc(t.priority)}] {_esc(t.title)} ({t.estimated_hours:.1f}h){flag}")
+        task_list = "\n".join(task_lines)
+
+        human_count = sum(1 for t in plan.tasks if t.requires_human)
+        human_note = f"\n{human_count} task(s) need human action \\[!]" if human_count else ""
+
         summary = (
-            f"*Refined: {plan.title}*\n\n"
-            f"{plan.summary}\n\n"
+            f"*Refined: {_esc(plan.title)}*\n\n"
+            f"{_esc(plan.summary)}\n\n"
             f"*Tasks ({plan.total_estimated_hours:.1f}h total):*\n"
-            f"{task_list}"
+            f"{task_list}{human_note}"
         )
 
         keyboard = InlineKeyboardMarkup([
@@ -376,7 +480,7 @@ def start_bot():
         asyncio.set_event_loop(loop)
         loop.run_until_complete(_bot_app.initialize())
         loop.run_until_complete(_bot_app.start())
-        loop.run_until_complete(_bot_app.updater.start_polling())
+        loop.run_until_complete(_bot_app.updater.start_polling(drop_pending_updates=True))
         logger.info("Telegram bot is running")
         loop.run_forever()
 

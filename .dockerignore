@@ -1,0 +1,14 @@
+.venv/
+__pycache__/
+*.pyc
+.env
+tmp/
+.git/
+.claude/
+.planning/
+plans/
+*.egg-info/
+DylansScript.png
+DylansScript.png:Zone.Identifier
+open-in-wsl.reg
+HANDOFF.md

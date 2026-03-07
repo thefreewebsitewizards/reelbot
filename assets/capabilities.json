@@ -1,0 +1,44 @@
+{
+  "mcps": [
+    {
+      "name": "ghl",
+      "status": "implemented",
+      "capabilities": [
+        "modify_workflows",
+        "update_sequences",
+        "manage_pipelines"
+      ]
+    }
+  ],
+  "integrations": [
+    {
+      "name": "n8n",
+      "status": "active",
+      "host": "n8n.leadneedleai.com"
+    },
+    {
+      "name": "ghl",
+      "status": "active",
+      "features": [
+        "crm",
+        "pipelines",
+        "email_sms",
+        "calendars"
+      ]
+    },
+    {
+      "name": "meta_ads",
+      "status": "active"
+    },
+    {
+      "name": "telegram_bot",
+      "status": "active"
+    },
+    {
+      "name": "website",
+      "status": "active",
+      "url": "thefreewebsitewizards.com"
+    }
+  ],
+  "notes": "Update this file when new MCPs or integrations are built."
+}

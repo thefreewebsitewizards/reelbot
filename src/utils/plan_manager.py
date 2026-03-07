@@ -63,7 +63,8 @@ def update_plan_status(reel_id: str, new_status: PlanStatus) -> bool:
 
 def _trigger_execution(reel_id: str, plan_dir_name: str | None) -> None:
     """Fire-and-forget notification that a plan is ready for execution.
-    Writes a trigger file that Claude Code or a cron job can watch for."""
+    Writes a trigger file that Claude Code or a cron job can watch for,
+    and POSTs to an n8n webhook if configured."""
     trigger_path = settings.plans_dir / "_approved_queue.json"
     queue = []
     if trigger_path.exists():
@@ -80,6 +81,20 @@ def _trigger_execution(reel_id: str, plan_dir_name: str | None) -> None:
         with open(trigger_path, "w") as f:
             json.dump(queue, f, indent=2)
         logger.info(f"Execution trigger: {reel_id} added to approved queue")
+
+    # POST to n8n webhook if configured (non-blocking, best-effort)
+    if settings.n8n_execution_webhook:
+        try:
+            import httpx
+
+            httpx.post(
+                settings.n8n_execution_webhook,
+                json={"reel_id": reel_id, "plan_dir": plan_dir_name},
+                timeout=5.0,
+            )
+            logger.info(f"n8n webhook triggered for {reel_id}")
+        except Exception as exc:
+            logger.warning(f"n8n webhook failed (non-blocking): {exc}")
 
 
 def get_plans_by_status(status: PlanStatus) -> list[dict]:

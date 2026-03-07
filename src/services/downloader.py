@@ -24,15 +24,20 @@ def extract_shortcode(url: str) -> str:
     raise ValueError(f"Could not extract shortcode from URL: {url}")
 
 
-def download_reel(url: str, output_dir: Path) -> tuple[Path, ReelMetadata]:
-    """Download reel with yt-dlp, falling back to Apify if it fails."""
+def download_reel(url: str, output_dir: Path) -> tuple[Path | list[Path], ReelMetadata]:
+    """Download reel/carousel with yt-dlp, falling back to Apify if it fails.
+
+    Returns (video_path, metadata) for reels or (image_paths, metadata) for carousels.
+    """
     shortcode = extract_shortcode(url)
 
     # Try yt-dlp first
+    ytdlp_err = None
     try:
         return _download_ytdlp(url, shortcode, output_dir)
     except Exception as e:
-        logger.warning(f"yt-dlp failed: {e}")
+        ytdlp_err = str(e)
+        logger.warning(f"yt-dlp failed: {ytdlp_err}")
 
     # Fallback to Apify
     if settings.apify_api_key:
@@ -41,13 +46,13 @@ def download_reel(url: str, output_dir: Path) -> tuple[Path, ReelMetadata]:
             return _download_apify(url, shortcode, output_dir)
         except Exception as e2:
             logger.error(f"Apify fallback also failed: {e2}")
-            raise RuntimeError(f"All download methods failed. yt-dlp: {e} | Apify: {e2}")
+            raise RuntimeError(f"All download methods failed. yt-dlp: {ytdlp_err} | Apify: {e2}")
     else:
-        raise RuntimeError(f"yt-dlp failed and no APIFY_API_KEY configured: {e}")
+        raise RuntimeError(f"yt-dlp failed and no APIFY_API_KEY configured: {ytdlp_err}")
 
 
-def _download_ytdlp(url: str, shortcode: str, output_dir: Path) -> tuple[Path, ReelMetadata]:
-    """Download using yt-dlp."""
+def _download_ytdlp(url: str, shortcode: str, output_dir: Path) -> tuple[Path | list[Path], ReelMetadata]:
+    """Download using yt-dlp. Detects carousel posts (images) vs reels (video)."""
     output_path = output_dir / f"{shortcode}.mp4"
     info_path = output_dir / f"{shortcode}.info.json"
 
@@ -65,15 +70,7 @@ def _download_ytdlp(url: str, shortcode: str, output_dir: Path) -> tuple[Path, R
     if result.returncode != 0:
         raise RuntimeError(result.stderr[:500])
 
-    if not output_path.exists():
-        candidates = list(output_dir.glob(f"{shortcode}.*"))
-        video_files = [f for f in candidates if f.suffix in (".mp4", ".webm") and ".info" not in f.name]
-        if video_files:
-            output_path = video_files[0]
-        else:
-            raise FileNotFoundError(f"Downloaded file not found for {shortcode}")
-
-    # Parse metadata
+    # Parse metadata first (need it for content_type detection)
     creator = ""
     caption = ""
     duration = 0.0
@@ -83,6 +80,26 @@ def _download_ytdlp(url: str, shortcode: str, output_dir: Path) -> tuple[Path, R
         creator = info.get("uploader", "") or info.get("channel", "")
         caption = info.get("description", "") or info.get("title", "")
         duration = info.get("duration", 0.0) or 0.0
+
+    # Check for carousel (multiple images downloaded)
+    image_files = sorted(output_dir.glob(f"{shortcode}*.jpg")) + sorted(output_dir.glob(f"{shortcode}*.png"))
+    if image_files and not output_path.exists():
+        # This is a carousel post
+        metadata = ReelMetadata(
+            url=url, shortcode=shortcode, creator=creator,
+            caption=caption, duration=0.0, content_type="carousel",
+        )
+        logger.info(f"Downloaded carousel via yt-dlp: {len(image_files)} images by {creator}")
+        return image_files, metadata
+
+    # Standard video path
+    if not output_path.exists():
+        candidates = list(output_dir.glob(f"{shortcode}.*"))
+        video_files = [f for f in candidates if f.suffix in (".mp4", ".webm") and ".info" not in f.name]
+        if video_files:
+            output_path = video_files[0]
+        else:
+            raise FileNotFoundError(f"Downloaded file not found for {shortcode}")
 
     metadata = ReelMetadata(
         url=url, shortcode=shortcode, creator=creator,

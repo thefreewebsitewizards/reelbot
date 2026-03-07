@@ -3,9 +3,21 @@ from pydantic_settings import BaseSettings
 
 
 class Settings(BaseSettings):
-    # Anthropic
+    # Anthropic (direct — currently out of credits)
     anthropic_api_key: str = ""
     anthropic_model: str = "claude-sonnet-4-20250514"
+
+    # OpenRouter (LLM provider)
+    openrouter_api_key: str = ""
+    openrouter_model: str = "google/gemini-2.5-pro"
+    openrouter_base_url: str = "https://openrouter.ai/api/v1"
+
+    # Per-step model overrides (leave blank to use openrouter_model)
+    openrouter_model_analysis: str = ""
+    openrouter_model_plan: str = ""
+    openrouter_model_similarity: str = "google/gemini-2.5-flash"
+    openrouter_model_repurposing: str = ""
+    openrouter_model_personal_brand: str = ""
 
     # Apify fallback
     apify_api_key: str = ""
@@ -18,13 +30,18 @@ class Settings(BaseSettings):
     # Paths
     plans_dir: Path = Path("plans")
     temp_dir: Path = Path("tmp")
+    sister_projects_dir: Path = Path(__file__).resolve().parent.parent.parent
 
     # Telegram
     telegram_bot_token: str = ""
 
+    # n8n
+    n8n_execution_webhook: str = ""  # e.g. https://n8n.leadneedleai.com/webhook/plan-approved
+
     # Server
     host: str = "127.0.0.1"
     port: int = 8000
+    public_url: str = ""  # e.g. https://reelbot.leadneedleai.com
 
     model_config = {"env_file": ".env", "env_file_encoding": "utf-8", "extra": "ignore"}
 
