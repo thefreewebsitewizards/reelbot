@@ -14,6 +14,7 @@ from src.prompts.analyze_reel import (
     build_carousel_analysis_prompt,
 )
 from src.services.llm import chat, ChatResult, get_model_for_step
+from src.utils.json_extract import extract_json
 
 
 def _frames_to_openai_content(frame_paths: list[Path]) -> list[dict]:
@@ -51,17 +52,10 @@ def analyze_reel(
         openai_content = user_prompt
 
     chat_result = chat(system=system_prompt, user_content=openai_content, max_tokens=4000, model_override=get_model_for_step("analysis"))
-    raw = chat_result.text
 
     # Parse structured JSON from response
     try:
-        json_text = raw
-        if "```json" in raw:
-            json_text = raw.split("```json")[1].split("```")[0]
-        elif "```" in raw:
-            json_text = raw.split("```")[1].split("```")[0]
-
-        data = json.loads(json_text)
+        data = extract_json(chat_result.text, context="analyzer")
 
         # Parse nested models
         vb_data = data.get("video_breakdown") or {}
@@ -127,8 +121,10 @@ def analyze_reel(
             business_impact=data.get("business_impact", ""),
             fact_checks=fact_checks,
         )
-    except (json.JSONDecodeError, IndexError, KeyError, ValueError, TypeError):
-        logger.warning("Failed to parse structured response, using raw text")
+    except (json.JSONDecodeError, IndexError, KeyError, ValueError, TypeError) as e:
+        logger.warning(f"Failed to parse analysis JSON ({e}), using raw text")
+        logger.debug(f"finish_reason={chat_result.finish_reason}, tokens={chat_result.completion_tokens}/{chat_result.total_tokens}")
+        raw = chat_result.text
         result = AnalysisResult(
             category="general",
             summary=raw[:500],
@@ -161,17 +157,9 @@ def analyze_carousel(
     openai_content = image_blocks + [text_block]
 
     chat_result = chat(system=system_prompt, user_content=openai_content, max_tokens=4000, model_override=get_model_for_step("analysis"))
-    raw = chat_result.text
 
-    # Reuse the same parsing logic as analyze_reel
     try:
-        json_text = raw
-        if "```json" in raw:
-            json_text = raw.split("```json")[1].split("```")[0]
-        elif "```" in raw:
-            json_text = raw.split("```")[1].split("```")[0]
-
-        data = json.loads(json_text)
+        data = extract_json(chat_result.text, context="carousel_analyzer")
 
         vb_data = data.get("video_breakdown") or {}
         raw_quotes = vb_data.get("key_quotes") or []
@@ -235,8 +223,10 @@ def analyze_carousel(
             business_impact=data.get("business_impact", ""),
             fact_checks=fact_checks,
         )
-    except (json.JSONDecodeError, IndexError, KeyError, ValueError, TypeError):
-        logger.warning("Failed to parse carousel analysis, using raw text")
+    except (json.JSONDecodeError, IndexError, KeyError, ValueError, TypeError) as e:
+        logger.warning(f"Failed to parse carousel analysis JSON ({e}), using raw text")
+        logger.debug(f"finish_reason={chat_result.finish_reason}, tokens={chat_result.completion_tokens}/{chat_result.total_tokens}")
+        raw = chat_result.text
         result = AnalysisResult(
             category="general",
             summary=raw[:500],
