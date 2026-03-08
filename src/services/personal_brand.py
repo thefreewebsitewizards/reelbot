@@ -18,7 +18,7 @@ def generate_personal_brand_plan(
     )
 
     logger.info("Generating personal brand content plan...")
-    chat_result = chat(system=system_prompt, user_content=user_prompt, max_tokens=3000, model_override=get_model_for_step("personal_brand"))
+    chat_result = chat(system=system_prompt, user_content=user_prompt, max_tokens=4096, model_override=get_model_for_step("personal_brand"))
     raw = chat_result.text
 
     try:
