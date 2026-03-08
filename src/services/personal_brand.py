@@ -33,15 +33,15 @@ def generate_personal_brand_plan(
         tasks = []
         for t in data.get("tasks", []):
             tasks.append(PlanTask(
-                title=t.get("title", ""),
-                description=t.get("description", ""),
-                priority=t.get("priority", "medium"),
-                estimated_hours=float(t.get("estimated_hours", 1.0)),
-                deliverables=t.get("deliverables", []),
-                dependencies=t.get("dependencies", []),
-                tools=t.get("tools", []),
+                title=t.get("title") or "",
+                description=t.get("description") or "",
+                priority=t.get("priority") or "medium",
+                estimated_hours=float(t.get("estimated_hours") or 1.0),
+                deliverables=t.get("deliverables") or [],
+                dependencies=t.get("dependencies") or [],
+                tools=t.get("tools") or [],
                 requires_human=bool(t.get("requires_human", True)),
-                human_reason=t.get("human_reason", ""),
+                human_reason=t.get("human_reason") or "",
             ))
 
         plan = ImplementationPlan(
