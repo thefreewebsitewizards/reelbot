@@ -6,6 +6,7 @@ from loguru import logger
 from src.models import AnalysisResult, ReelMetadata, ImplementationPlan, PlanTask
 from src.prompts.personal_brand import build_personal_brand_prompt
 from src.services.llm import chat, ChatResult, get_model_for_step
+from src.utils.json_extract import extract_json
 
 
 def generate_personal_brand_plan(
@@ -19,16 +20,9 @@ def generate_personal_brand_plan(
 
     logger.info("Generating personal brand content plan...")
     chat_result = chat(system=system_prompt, user_content=user_prompt, max_tokens=4096, model_override=get_model_for_step("personal_brand"))
-    raw = chat_result.text
 
     try:
-        json_text = raw
-        if "```json" in raw:
-            json_text = raw.split("```json")[1].split("```")[0]
-        elif "```" in raw:
-            json_text = raw.split("```")[1].split("```")[0]
-
-        data = json.loads(json_text)
+        data = extract_json(chat_result.text, context="personal_brand")
 
         tasks = []
         for t in data.get("tasks", []):
@@ -50,8 +44,10 @@ def generate_personal_brand_plan(
             tasks=tasks,
             total_estimated_hours=sum(t.estimated_hours for t in tasks),
         )
-    except (json.JSONDecodeError, IndexError, KeyError):
-        logger.warning("Failed to parse personal brand JSON, creating single-task plan")
+    except (json.JSONDecodeError, IndexError, KeyError) as e:
+        logger.warning(f"Failed to parse personal brand JSON ({e}), creating single-task plan")
+        logger.debug(f"finish_reason={chat_result.finish_reason}, tokens={chat_result.completion_tokens}/{chat_result.total_tokens}")
+        raw = chat_result.text
         plan = ImplementationPlan(
             title=f"DDB Content: {metadata.shortcode}",
             summary=raw[:500],

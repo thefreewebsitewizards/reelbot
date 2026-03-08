@@ -29,6 +29,7 @@ class ChatResult:
     completion_tokens: int = 0
     total_tokens: int = 0
     cost_usd: float = 0.0
+    finish_reason: str = ""
 
 
 def estimate_cost(model: str, prompt_tokens: int, completion_tokens: int) -> float:
@@ -102,8 +103,13 @@ def chat(
             ) from e
         raise
 
-    msg = response.choices[0].message
+    choice = response.choices[0]
+    finish_reason = choice.finish_reason or ""
+    msg = choice.message
     text = msg.content
+
+    if finish_reason == "length":
+        logger.warning(f"LLM response truncated (finish_reason=length, model={model}, max_tokens={max_tokens})")
 
     # Reasoning models (e.g. kimi-k2.5) put output in reasoning instead of content
     if text is None and hasattr(msg, "reasoning") and msg.reasoning:
@@ -131,4 +137,5 @@ def chat(
         completion_tokens=completion_tokens,
         total_tokens=total_tokens,
         cost_usd=cost,
+        finish_reason=finish_reason,
     )
