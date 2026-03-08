@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-echo "=== Vibe Marketing Setup ==="
+echo "=== ReelBot Setup ==="
 
 # System dependencies
 echo "Installing ffmpeg..."

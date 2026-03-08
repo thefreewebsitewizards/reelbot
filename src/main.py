@@ -17,7 +17,7 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(
-    title="Vibe Marketing",
+    title="ReelBot",
     description="Instagram Reel → Business Strategy Pipeline",
     version="0.1.0",
     lifespan=lifespan,

@@ -1,4 +1,4 @@
-# Vibe Marketing — Claude Code Instructions
+# ReelBot — Claude Code Instructions
 
 ## Business Context
 

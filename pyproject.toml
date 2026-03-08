@@ -1,5 +1,5 @@
 [project]
-name = "vibe-marketing"
+name = "reelbot"
 version = "0.1.0"
 description = "Instagram Reel → Business Strategy Pipeline"
 requires-python = ">=3.12"

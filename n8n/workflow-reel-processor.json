@@ -223,7 +223,7 @@
     "executionOrder": "v1"
   },
   "tags": [
-    { "name": "vibe-marketing" }
+    { "name": "reelbot" }
   ],
   "pinData": {},
   "_comment": "SETUP: 1) Create Telegram bot via @BotFather, 2) Add Telegram credential in n8n with bot token, 3) Replace TELEGRAM_CREDENTIAL_ID with actual credential ID, 4) Ensure FastAPI server is running on localhost:8000, 5) Connect 'Process Reel API' error output to 'Send Error' node. FLOW: User sends reel link → bot sends 'processing' → API processes → bot sends summary + full plan as messages → user reviews and replies with feedback."
