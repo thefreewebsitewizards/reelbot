@@ -68,3 +68,29 @@ def extract_json(raw: str, context: str = "") -> dict:
         f"Response length: {len(text)} chars. Preview:\n{preview}"
     )
     raise json.JSONDecodeError("No valid JSON found in LLM response", text, 0)
+
+
+def normalize_string_list(items: list) -> list[str]:
+    """Convert a list of mixed strings/dicts into a list of strings.
+
+    LLMs sometimes return dicts like {"type": "...", "content": "..."}
+    instead of plain strings for fields like deliverables.
+    """
+    result = []
+    for item in items:
+        if isinstance(item, str):
+            result.append(item)
+        elif isinstance(item, dict):
+            # Try common keys, fall back to JSON dump
+            text = (
+                item.get("content")
+                or item.get("text")
+                or item.get("description")
+                or item.get("title")
+                or item.get("name")
+                or json.dumps(item)
+            )
+            result.append(str(text))
+        else:
+            result.append(str(item))
+    return result

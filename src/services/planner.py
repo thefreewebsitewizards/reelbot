@@ -10,7 +10,7 @@ from src.prompts.generate_plan import build_plan_prompt
 from src.utils.plan_manager import get_past_plan_summaries
 from src.utils.capability_manager import get_capabilities_context
 from src.services.llm import chat, ChatResult, get_model_for_step
-from src.utils.json_extract import extract_json
+from src.utils.json_extract import extract_json, normalize_string_list
 
 
 def check_plan_similarity(analysis: AnalysisResult) -> tuple[SimilarityResult, ChatResult | None]:
@@ -111,9 +111,9 @@ def generate_plan(analysis: AnalysisResult, metadata: ReelMetadata) -> tuple[Imp
                 description=t.get("description") or "",
                 priority=t.get("priority") or "medium",
                 estimated_hours=float(t.get("estimated_hours") or 1.0),
-                deliverables=t.get("deliverables") or [],
-                dependencies=t.get("dependencies") or [],
-                tools=t.get("tools") or [],
+                deliverables=normalize_string_list(t.get("deliverables") or []),
+                dependencies=normalize_string_list(t.get("dependencies") or []),
+                tools=normalize_string_list(t.get("tools") or []),
                 requires_human=bool(t.get("requires_human", False)),
                 human_reason=t.get("human_reason") or "",
             ))

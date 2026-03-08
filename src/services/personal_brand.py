@@ -6,7 +6,7 @@ from loguru import logger
 from src.models import AnalysisResult, ReelMetadata, ImplementationPlan, PlanTask
 from src.prompts.personal_brand import build_personal_brand_prompt
 from src.services.llm import chat, ChatResult, get_model_for_step
-from src.utils.json_extract import extract_json
+from src.utils.json_extract import extract_json, normalize_string_list
 
 
 def generate_personal_brand_plan(
@@ -31,9 +31,9 @@ def generate_personal_brand_plan(
                 description=t.get("description") or "",
                 priority=t.get("priority") or "medium",
                 estimated_hours=float(t.get("estimated_hours") or 1.0),
-                deliverables=t.get("deliverables") or [],
-                dependencies=t.get("dependencies") or [],
-                tools=t.get("tools") or [],
+                deliverables=normalize_string_list(t.get("deliverables") or []),
+                dependencies=normalize_string_list(t.get("dependencies") or []),
+                tools=normalize_string_list(t.get("tools") or []),
                 requires_human=bool(t.get("requires_human", True)),
                 human_reason=t.get("human_reason") or "",
             ))
