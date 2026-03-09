@@ -80,8 +80,9 @@
   .collapsible-content.open { display: block; }
   .action-bar { display: flex; gap: 8px; margin-bottom: 16px; flex-wrap: wrap; }
   .action-btn {
-    padding: 8px 16px; border: none; border-radius: 6px; cursor: pointer;
-    font-weight: 600; font-size: 0.85rem; color: #fff; transition: opacity 0.2s;
+    padding: 10px 18px; border: none; border-radius: 8px; cursor: pointer;
+    font-weight: 600; font-size: 0.9rem; color: #fff; transition: opacity 0.2s;
+    min-height: 44px; min-width: 44px;
   }
   .action-btn:hover { opacity: 0.85; }
   .action-btn:disabled { opacity: 0.4; cursor: not-allowed; }
@@ -91,11 +92,27 @@
   .action-btn.back { background: #475569; }
   .action-status { color: #94a3b8; font-size: 0.85rem; align-self: center; }
   .badge-route { background: #0891b2; margin-left: 4px; vertical-align: middle; }
+  table { width: 100%; border-collapse: collapse; }
   table th, table td { padding: 6px 10px; text-align: left; }
+  .cost-table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
   @media (max-width: 600px) {
-    body { padding: 12px; }
-    h1 { font-size: 1.25rem; }
-    .task, .card { padding: 12px; }
+    body { padding: 10px; }
+    h1 { font-size: 1.2rem; word-break: break-word; }
+    h2 { font-size: 1.05rem; margin-top: 24px; }
+    .task, .card { padding: 10px; }
+    .action-bar { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+    .action-btn { text-align: center; padding: 12px 10px; font-size: 0.85rem; }
+    .action-btn.back { grid-column: 1 / -1; }
+    .action-status { grid-column: 1 / -1; text-align: center; }
+    .meta { font-size: 0.8rem; }
+    .impact { padding: 10px 12px; }
+    .quote { padding: 8px 12px; font-size: 0.9rem; }
+    .hook { padding: 8px 12px; }
+    .point-list li { padding: 8px 10px 8px 32px; font-size: 0.9rem; }
+    .similarity-callout { padding: 10px 12px; font-size: 0.85rem; }
+    table th, table td { padding: 4px 6px; font-size: 0.8rem; white-space: nowrap; }
+    .collapsible-content { display: block; }
+    .collapsible::after { content: " −"; }
   }
 </style>
 </head>

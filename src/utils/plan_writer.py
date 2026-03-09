@@ -478,13 +478,13 @@ def _render_plan_html(result: PipelineResult) -> str:
         )
         cost_html = (
             f'<h2>Cost Breakdown</h2>'
-            f'<div class="card"><table style="width:100%;border-collapse:collapse;">'
+            f'<div class="card"><div class="cost-table-wrap"><table>'
             f'<tr style="color:#94a3b8;text-align:left;"><th>Step</th><th>Prompt</th>'
             f'<th>Completion</th><th>Cost</th></tr>'
             f'{cost_rows}'
             f'<tr style="border-top:1px solid #334155;font-weight:600;">'
             f'<td>Total</td><td colspan="2"></td><td>${cb.total_cost_usd:.4f}</td></tr>'
-            f'</table></div>'
+            f'</table></div></div>'
         )
 
     replacements = {
