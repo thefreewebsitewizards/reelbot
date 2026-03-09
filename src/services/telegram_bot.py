@@ -380,12 +380,17 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             elif similarity.recommendation == "skip":
                 similarity_line += " — very similar, review carefully"
 
-        # Resolve actual costs from OpenRouter
+        # Resolve actual costs (saved to metadata, not shown in message)
         costs.resolve_actual_costs()
 
-        cost_line = ""
-        if costs.calls:
-            cost_line = _format_cost_line(costs)
+        # First task as implementation snippet
+        impl_snippet = ""
+        if plan.tasks:
+            first_task = plan.tasks[0]
+            desc_preview = first_task.description[:150]
+            if len(first_task.description) > 150:
+                desc_preview += "..."
+            impl_snippet = f"\n\n*First step:* {_esc(first_task.title)}\n{_esc(desc_preview)}"
 
         summary = (
             f"*{_esc(plan.title)}*\n"
@@ -394,10 +399,10 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             f"{video_section}"
             f"{impact_line}"
             f"*Tasks ({plan.total_estimated_hours:.1f}h):*\n"
-            f"{task_list}{human_note}{repurposing_line}{personal_brand_line}"
+            f"{task_list}{human_note}"
+            f"{impl_snippet}"
             f"{fact_warnings}"
             f"{similarity_line}"
-            f"{cost_line}"
         )
 
         base_url = settings.public_url or f"http://{settings.host}:{settings.port}"
