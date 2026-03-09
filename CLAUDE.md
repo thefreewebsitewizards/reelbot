@@ -3,9 +3,12 @@
 ## Business Context
 
 This project belongs to **Lead Needle LLC / The Free Website Wizards**.
-- Business context is loaded dynamically from `~/projects/openclaw/.shared-context/` into LLM prompts
-- See `src/utils/shared_context.py` for the loader
-- To update ReelBot's own context: edit `~/projects/openclaw/.shared-context/reelbot.md`
+- Business context is loaded dynamically into LLM prompts from shared context files
+- Local dev reads from `~/projects/openclaw/.shared-context/` (live, updated by project sessions)
+- Production reads from `shared-context/` in the repo (bundled into Docker image)
+- A git pre-commit hook auto-syncs `~/.shared-context/*.md` → `shared-context/` on every commit
+- See `src/utils/shared_context.py` for the loader logic
+- **After updating ReelBot's capabilities**: edit `~/projects/openclaw/.shared-context/reelbot.md` — it syncs to the repo automatically on next commit
 
 ## What This Project Does
 
