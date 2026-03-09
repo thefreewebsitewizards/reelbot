@@ -1,4 +1,5 @@
 from src.models import AnalysisResult, ReelMetadata
+from src.utils.feedback import get_recent_feedback
 
 SYSTEM_PROMPT = """You are an implementation planner for Lead Needle LLC / The Free Website Wizards.
 
@@ -95,6 +96,31 @@ CAPABILITIES_SECTION = """
 **Existing Capabilities (DO NOT suggest rebuilding these — reference them for new use cases instead):**
 {capabilities}"""
 
+FEEDBACK_SECTION = """
+
+## Past Feedback (learn from these):
+{feedback_lines}
+
+Use this feedback to improve the quality of your plan. Repeat what worked, avoid what didn't."""
+
+
+def get_feedback_context() -> str:
+    """Format recent feedback entries for inclusion in prompts."""
+    entries = get_recent_feedback(5)
+    if not entries:
+        return ""
+
+    rating_labels = {"good": "GOOD", "bad": "BAD", "partial": "PARTIAL"}
+    lines = []
+    for entry in entries:
+        label = rating_labels.get(entry["rating"], entry["rating"].upper())
+        title = entry["plan_title"] or entry["reel_id"]
+        comment_part = f': "{entry["comment"]}"' if entry["comment"] else ""
+        lines.append(f'- Plan "{title}" was rated {label}{comment_part}')
+
+    return "\n".join(lines)
+
+
 SCRIPT_CONTEXT_SECTION = """
 
 **Current Sales Script (modify sections via API):**
@@ -163,5 +189,9 @@ def build_plan_prompt(
             script_content=script_context,
             section_ids=script_section_ids,
         )
+
+    feedback_context = get_feedback_context()
+    if feedback_context:
+        user_prompt += FEEDBACK_SECTION.format(feedback_lines=feedback_context)
 
     return SYSTEM_PROMPT, user_prompt

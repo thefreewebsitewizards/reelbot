@@ -1,6 +1,8 @@
 from pathlib import Path
+
 from src.models import TranscriptResult, ReelMetadata
 from src.services.frames import frames_to_base64
+from src.utils.feedback import get_recent_feedback
 
 SYSTEM_PROMPT = """You are a business strategy analyst for Lead Needle LLC / The Free Website Wizards.
 
@@ -136,6 +138,31 @@ VISION_USER_ADDENDUM = """
 I've also included keyframes from the video above. Read any on-screen text, URLs, tool names, repo names, stats, or visuals and incorporate them into your analysis. If the speaker references something shown on screen, identify it specifically from the frames — names, URLs, numbers, etc."""
 
 
+ANALYSIS_FEEDBACK_SECTION = """
+
+## Past Plan Feedback (use this to guide your analysis depth and focus):
+{feedback_lines}
+
+Tailor your analysis to produce insights that lead to better plans. If past feedback says tasks were too vague, provide more specific details. If plans had too many tasks, focus on fewer, higher-impact insights."""
+
+
+def get_analysis_feedback_context() -> str:
+    """Format recent feedback for inclusion in analysis prompts."""
+    entries = get_recent_feedback(5)
+    if not entries:
+        return ""
+
+    rating_labels = {"good": "GOOD", "bad": "BAD", "partial": "PARTIAL"}
+    lines = []
+    for entry in entries:
+        label = rating_labels.get(entry["rating"], entry["rating"].upper())
+        title = entry["plan_title"] or entry["reel_id"]
+        comment_part = f': "{entry["comment"]}"' if entry["comment"] else ""
+        lines.append(f'- Plan "{title}" was rated {label}{comment_part}')
+
+    return "\n".join(lines)
+
+
 CAROUSEL_USER_TEMPLATE = """Analyze this Instagram carousel post for actionable business insights.
 
 **Creator:** {creator}
@@ -205,6 +232,13 @@ def build_analysis_prompt(
         duration=metadata.duration,
         text=transcript.text,
     )
+
+    feedback_context = get_analysis_feedback_context()
+    if feedback_context:
+        user_prompt += ANALYSIS_FEEDBACK_SECTION.format(
+            feedback_lines=feedback_context,
+        )
+
     return SYSTEM_PROMPT, user_prompt
 
 
@@ -224,6 +258,12 @@ def build_carousel_analysis_prompt(
         slide_count=len(image_paths),
         text=ocr_text or "No text extracted from images",
     )
+
+    feedback_context = get_analysis_feedback_context()
+    if feedback_context:
+        text_prompt += ANALYSIS_FEEDBACK_SECTION.format(
+            feedback_lines=feedback_context,
+        )
 
     content = image_blocks + [{"type": "text", "text": text_prompt}]
     return system, content
@@ -245,6 +285,12 @@ def build_vision_analysis_prompt(
         duration=metadata.duration,
         text=transcript.text,
     ) + VISION_USER_ADDENDUM
+
+    feedback_context = get_analysis_feedback_context()
+    if feedback_context:
+        text_prompt += ANALYSIS_FEEDBACK_SECTION.format(
+            feedback_lines=feedback_context,
+        )
 
     content = image_blocks + [{"type": "text", "text": text_prompt}]
     return system, content
