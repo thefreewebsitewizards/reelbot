@@ -15,6 +15,7 @@ COPY src/ src/
 COPY static/ static/
 COPY assets/ assets/
 COPY scripts/ scripts/
+COPY shared-context/ shared-context/
 
 # Install the project and all dependencies
 RUN pip install --no-cache-dir .

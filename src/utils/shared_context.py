@@ -1,8 +1,29 @@
-"""Load shared project context from ~/.shared-context/ for dynamic prompt injection."""
+"""Load shared project context for dynamic prompt injection.
+
+Checks two locations:
+1. ~/projects/openclaw/.shared-context/ (local dev, updated by project sessions)
+2. /app/shared-context/ or ./shared-context/ (bundled in Docker image for production)
+"""
 
 from pathlib import Path
 
-SHARED_CONTEXT_DIR = Path.home() / "projects" / "openclaw" / ".shared-context"
+# Local dev path (updated live by project sessions)
+_LOCAL_DIR = Path.home() / "projects" / "openclaw" / ".shared-context"
+# Bundled path (baked into Docker image at build time)
+_BUNDLED_DIR = Path("/app/shared-context")
+# Repo-relative fallback
+_REPO_DIR = Path(__file__).resolve().parent.parent.parent / "shared-context"
+
+
+def _get_context_dir() -> Path | None:
+    """Return the first available shared context directory."""
+    for d in (_LOCAL_DIR, _BUNDLED_DIR, _REPO_DIR):
+        if d.exists() and any(d.glob("*.md")):
+            return d
+    return None
+
+
+SHARED_CONTEXT_DIR = _get_context_dir() or _LOCAL_DIR  # resolved at import time
 
 # Map routing targets to context file names
 ROUTING_TO_CONTEXT = {
