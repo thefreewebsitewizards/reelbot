@@ -1,9 +1,11 @@
+import json
 from collections import defaultdict
 from pathlib import Path
 
 from fastapi import APIRouter
 from fastapi.responses import HTMLResponse
 
+from src.config import settings
 from src.utils.plan_manager import get_index
 
 router = APIRouter()
@@ -62,7 +64,7 @@ def dashboard():
         f'<div class="stat"><div class="stat-value">{review_count}</div><div class="stat-label">In Review</div></div>'
         f'<div class="stat"><div class="stat-value">{approved_count}</div><div class="stat-label">Approved</div></div>'
         f'<div class="stat"><div class="stat-value">{completed_count}</div><div class="stat-label">Completed</div></div>'
-        f'<div class="stat"><div class="stat-value">${total_cost:.3f}</div><div class="stat-label">Total Cost</div></div>'
+        f'<a href="/costs" class="stat" style="text-decoration:none;color:inherit;"><div class="stat-value">${total_cost:.3f}</div><div class="stat-label">Total Cost →</div></a>'
         '</div>'
     )
 
@@ -130,4 +132,139 @@ def dashboard():
 
     html = template.replace("{{stats_html}}", stats_html)
     html = html.replace("{{categories_html}}", categories_html)
+    return HTMLResponse(html)
+
+
+_STEP_COLORS = {
+    "analysis": "#3b82f6",
+    "similarity": "#f59e0b",
+    "plan": "#22c55e",
+    "repurposing": "#a78bfa",
+    "personal_brand": "#f472b6",
+}
+
+
+@router.get("/costs", response_class=HTMLResponse)
+def costs_page():
+    """Serve the cost breakdown page with per-plan and per-step details."""
+    template_path = Path(__file__).resolve().parent.parent.parent / "static" / "costs.html"
+    template = template_path.read_text()
+
+    index = get_index()
+    plans = index.get("plans", [])
+
+    # Load cost breakdowns from metadata files
+    plan_costs = []
+    step_totals: dict[str, float] = defaultdict(float)
+    total_estimated = 0.0
+    total_actual = 0.0
+    total_tokens = 0
+
+    for p in plans:
+        plan_dir = p.get("plan_dir", "")
+        meta_path = settings.plans_dir / plan_dir / "metadata.json"
+        if not meta_path.exists():
+            continue
+
+        try:
+            meta = json.loads(meta_path.read_text())
+        except (json.JSONDecodeError, OSError):
+            continue
+
+        cb = meta.get("cost_breakdown")
+        if not cb or not cb.get("calls"):
+            continue
+
+        calls = cb["calls"]
+        plan_est = sum(c.get("cost_usd", 0) for c in calls)
+        plan_actual = sum(c.get("actual_cost_usd", 0) for c in calls if c.get("actual_cost_usd") is not None)
+        plan_tokens = sum(c.get("prompt_tokens", 0) + c.get("completion_tokens", 0) for c in calls)
+        has_actual = any(c.get("actual_cost_usd") is not None for c in calls)
+
+        total_estimated += plan_est
+        total_actual += plan_actual
+        total_tokens += plan_tokens
+
+        step_pills = []
+        for c in calls:
+            step = c.get("step", "?")
+            cost = c.get("actual_cost_usd") if c.get("actual_cost_usd") is not None else c.get("cost_usd", 0)
+            step_totals[step] += cost
+            color = _STEP_COLORS.get(step, "#64748b")
+            step_pills.append(
+                f'<span class="step-pill" style="background:{color};">'
+                f'{_esc(step)} ${cost:.4f}</span>'
+            )
+
+        plan_costs.append({
+            "reel_id": p.get("reel_id", ""),
+            "title": p.get("title", "Untitled"),
+            "created_at": p.get("created_at", ""),
+            "estimated": plan_est,
+            "actual": plan_actual if has_actual else None,
+            "tokens": plan_tokens,
+            "step_pills": "".join(step_pills),
+        })
+
+    # Sort newest first
+    plan_costs.sort(key=lambda x: x["created_at"], reverse=True)
+
+    # Totals cards
+    actual_card = ""
+    if total_actual > 0:
+        actual_card = (
+            f'<div class="total-card">'
+            f'<div class="total-value">${total_actual:.4f}</div>'
+            f'<div class="total-label">Actual Cost</div></div>'
+        )
+    totals_html = (
+        f'<div class="total-card">'
+        f'<div class="total-value">${total_estimated:.4f}</div>'
+        f'<div class="total-label">Estimated Cost</div></div>'
+        f'{actual_card}'
+        f'<div class="total-card">'
+        f'<div class="total-value">{total_tokens:,}</div>'
+        f'<div class="total-label">Total Tokens</div></div>'
+        f'<div class="total-card">'
+        f'<div class="total-value">{len(plan_costs)}</div>'
+        f'<div class="total-label">Plans with Cost Data</div></div>'
+    )
+
+    # Step bars
+    max_step_cost = max(step_totals.values()) if step_totals else 1
+    step_bars_html = ""
+    for step, cost in sorted(step_totals.items(), key=lambda x: -x[1]):
+        pct = (cost / max_step_cost) * 100 if max_step_cost > 0 else 0
+        color = _STEP_COLORS.get(step, "#64748b")
+        step_bars_html += (
+            f'<div class="step-bar">'
+            f'<div class="step-name">{_esc(step)}</div>'
+            f'<div class="step-fill-wrap"><div class="step-fill" style="width:{pct:.0f}%;background:{color};"></div></div>'
+            f'<div class="step-cost">${cost:.4f}</div>'
+            f'</div>'
+        )
+
+    # Plan rows
+    plan_rows_html = ""
+    for pc in plan_costs:
+        cost_display = f"${pc['actual']:.4f}" if pc["actual"] is not None else f"${pc['estimated']:.4f}"
+        date = pc["created_at"][:10] if pc["created_at"] else ""
+        plan_rows_html += (
+            f'<a class="plan-row" href="/plans/{_esc(pc["reel_id"])}/view">'
+            f'<div class="plan-row-top">'
+            f'<div class="plan-row-title">{_esc(pc["title"])}</div>'
+            f'<div class="plan-row-cost">{cost_display}</div>'
+            f'</div>'
+            f'<div class="plan-row-meta">'
+            f'<div class="step-pills">{pc["step_pills"]}</div>'
+            f'<span class="plan-row-date">{date} · {pc["tokens"]:,} tokens</span>'
+            f'</div></a>'
+        )
+
+    if not plan_rows_html:
+        plan_rows_html = '<div style="color:#64748b;text-align:center;padding:40px;">No cost data available yet.</div>'
+
+    html = template.replace("{{totals_html}}", totals_html)
+    html = html.replace("{{step_bars_html}}", step_bars_html)
+    html = html.replace("{{plan_rows_html}}", plan_rows_html)
     return HTMLResponse(html)

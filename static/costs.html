@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ReelBot — Cost Breakdown</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    background: #0f172a; color: #e2e8f0;
+    line-height: 1.6; padding: 16px;
+    max-width: 900px; margin: 0 auto;
+  }
+  a { color: #60a5fa; text-decoration: none; }
+  a:hover { text-decoration: underline; }
+  h1 { font-size: 1.5rem; color: #f8fafc; margin-bottom: 4px; }
+  h2 { font-size: 1.15rem; color: #f8fafc; margin-top: 24px; margin-bottom: 12px; }
+
+  .header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px; flex-wrap: wrap; gap: 12px; }
+  .back-btn {
+    background: #475569; color: #fff; border: none; border-radius: 6px;
+    padding: 8px 16px; cursor: pointer; font-size: 0.85rem; font-weight: 600;
+    text-decoration: none; display: inline-block;
+  }
+  .back-btn:hover { background: #64748b; text-decoration: none; }
+
+  .totals {
+    display: flex; gap: 12px; margin-bottom: 24px; flex-wrap: wrap;
+  }
+  .total-card {
+    background: #1e293b; border-radius: 8px; padding: 16px 20px;
+    flex: 1; min-width: 120px; text-align: center;
+  }
+  .total-value { font-size: 1.5rem; font-weight: 700; color: #a78bfa; }
+  .total-label { font-size: 0.75rem; color: #64748b; text-transform: uppercase; margin-top: 2px; }
+
+  .step-totals {
+    background: #1e293b; border-radius: 8px; padding: 16px; margin-bottom: 24px;
+  }
+  .step-totals h2 { margin-top: 0; }
+  .step-bar { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
+  .step-name { width: 120px; font-size: 0.85rem; color: #94a3b8; text-align: right; flex-shrink: 0; }
+  .step-fill-wrap { flex: 1; background: #334155; border-radius: 4px; height: 20px; overflow: hidden; }
+  .step-fill { height: 100%; border-radius: 4px; transition: width 0.3s; }
+  .step-cost { width: 70px; font-size: 0.85rem; color: #e2e8f0; font-weight: 600; }
+
+  .plan-row {
+    display: block; background: #1e293b; border-radius: 6px;
+    padding: 12px 16px; margin-bottom: 6px;
+    cursor: pointer; text-decoration: none; color: inherit;
+    transition: background 0.15s;
+  }
+  .plan-row:hover { background: #263347; text-decoration: none; }
+  .plan-row-top { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+  .plan-row-title { font-weight: 600; color: #f1f5f9; font-size: 0.9rem; }
+  .plan-row-cost { font-weight: 700; color: #a78bfa; font-size: 0.95rem; white-space: nowrap; }
+  .plan-row-meta { display: flex; gap: 8px; margin-top: 4px; flex-wrap: wrap; }
+  .plan-row-date { color: #64748b; font-size: 0.75rem; }
+  .step-pills { display: flex; gap: 4px; flex-wrap: wrap; }
+  .step-pill {
+    font-size: 0.65rem; padding: 1px 6px; border-radius: 3px;
+    color: #fff; font-weight: 600;
+  }
+
+  @media (max-width: 600px) {
+    body { padding: 10px; }
+    h1 { font-size: 1.2rem; }
+    .totals { gap: 8px; }
+    .total-card { padding: 10px 12px; min-width: 80px; }
+    .total-value { font-size: 1.2rem; }
+    .step-name { width: 80px; font-size: 0.75rem; }
+    .step-cost { width: 55px; font-size: 0.75rem; }
+    .plan-row { padding: 10px 12px; }
+    .plan-row-title { font-size: 0.85rem; }
+  }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1>Cost Breakdown</h1>
+  <a href="/" class="back-btn">Dashboard</a>
+</div>
+
+<div class="totals">
+  {{totals_html}}
+</div>
+
+<div class="step-totals">
+  <h2>Cost by Step</h2>
+  {{step_bars_html}}
+</div>
+
+<h2>Per-Plan Costs (newest first)</h2>
+{{plan_rows_html}}
+
+</body>
+</html>

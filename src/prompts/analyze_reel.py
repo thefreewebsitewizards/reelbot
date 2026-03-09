@@ -3,26 +3,12 @@ from pathlib import Path
 from src.models import TranscriptResult, ReelMetadata
 from src.services.frames import frames_to_base64
 from src.utils.feedback import get_recent_feedback
+from src.utils.shared_context import build_business_context
 
-SYSTEM_PROMPT = """You are a technical analyst for Lead Needle LLC.
+SYSTEM_PROMPT_TEMPLATE = """You are a technical analyst for Lead Needle LLC.
 
-BUSINESS CONTEXT — GET THIS RIGHT:
-Lead Needle LLC operates TWO distinct brands:
-1. **The Free Website Wizards (TFWW)** — thefreewebsitewizards.com
-   - Offers FREE websites to local service businesses (HVAC, plumbers, roofers, dentists, lawyers)
-   - Revenue: paid ads management, upsells (AI chatbots, automation)
-   - Stack: GoHighLevel (GHL), n8n automations, Meta ads
-   - "On Us" model — the website is free, we make money on ads/services
-
-2. **Lead Needle / AI Appointment Setter (AIAS)** — the AI product
-   - AI-powered appointment setting chatbot that runs inside GHL
-   - Monitors leads, follows up automatically, books appointments
-   - THIS ALREADY EXISTS AND WORKS — don't suggest building it from scratch
-
-3. **Dylan Does Business (DDB)** — Dylan's personal brand
-   - Social media content about AI, business, entrepreneurship
-
-Tech stack already in use: GHL, n8n (at n8n.leadneedleai.com), Claude Code, Telegram bot (this system), Meta ads, Cloudflare
+BUSINESS CONTEXT — LIVE PROJECT DATA (auto-generated from project status files):
+{business_context}
 
 YOUR JOB: Extract PRACTICAL insights from Instagram Reels. Focus on:
 - What's the actual tool/technique shown?
@@ -36,8 +22,18 @@ CRITICAL RULES:
 - Match your output to the video type. A tech demo → tech implementation. A sales technique → sales insights.
 - Be SKEPTICAL of creator claims. Fact-check bold statements. Note if the creator is selling a course or has a financial incentive.
 - Keep analysis concise. No padding, no redundancy.
+- Reference EXISTING capabilities from the project data above. Don't suggest rebuilding what already works.
+- MATCH DEPTH TO COMPLEXITY. A simple "use this tool/skill" video needs a short analysis. A complex strategy video deserves more depth. Don't over-analyze simple content.
 
 Respond with valid JSON only. No markdown, no explanation outside the JSON."""
+
+
+def _get_system_prompt() -> str:
+    """Build system prompt with live business context."""
+    context = build_business_context()
+    if not context:
+        context = "(No shared context files found — check ~/projects/openclaw/.shared-context/)"
+    return SYSTEM_PROMPT_TEMPLATE.format(business_context=context)
 
 VISION_ADDENDUM = """
 
@@ -254,7 +250,7 @@ def build_analysis_prompt(
             feedback_lines=feedback_context,
         )
 
-    return SYSTEM_PROMPT, user_prompt
+    return _get_system_prompt(), user_prompt
 
 
 def build_carousel_analysis_prompt(
@@ -264,7 +260,7 @@ def build_carousel_analysis_prompt(
     user_context: str = "",
 ) -> tuple[str, list]:
     """Build a multimodal prompt for carousel analysis (images + OCR text)."""
-    system = SYSTEM_PROMPT + "\n\nYou are analyzing a carousel post (multiple images), not a video. There is no transcript — analyze the image content and OCR text directly."
+    system = _get_system_prompt() + "\n\nYou are analyzing a carousel post (multiple images), not a video. There is no transcript — analyze the image content and OCR text directly."
 
     image_blocks = frames_to_base64(image_paths)
 
@@ -295,7 +291,7 @@ def build_vision_analysis_prompt(
     user_context: str = "",
 ) -> tuple[str, list]:
     """Build a multimodal prompt with frames + transcript for Claude vision."""
-    system = SYSTEM_PROMPT + VISION_ADDENDUM
+    system = _get_system_prompt() + VISION_ADDENDUM
 
     image_blocks = frames_to_base64(frame_paths)
 

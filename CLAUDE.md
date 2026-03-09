@@ -3,10 +3,9 @@
 ## Business Context
 
 This project belongs to **Lead Needle LLC / The Free Website Wizards**.
-- AI-powered appointment setting and lead generation for local service businesses
-- Services: website builds, AI chatbots, automated follow-up, paid ads management
-- Target clients: HVAC, plumbers, roofers, dentists, lawyers, and other local service businesses
-- Tech stack: GoHighLevel (CRM), n8n (automations at n8n.leadneedleai.com), Claude/AI, Meta ads
+- Business context is loaded dynamically from `~/projects/openclaw/.shared-context/` into LLM prompts
+- See `src/utils/shared_context.py` for the loader
+- To update ReelBot's own context: edit `~/projects/openclaw/.shared-context/reelbot.md`
 
 ## What This Project Does
 

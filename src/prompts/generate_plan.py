@@ -1,19 +1,18 @@
 from src.models import AnalysisResult, ReelMetadata
 from src.utils.feedback import get_recent_feedback
+from src.utils.shared_context import build_business_context
 
-SYSTEM_PROMPT = """You are an implementation planner for Lead Needle LLC.
+SYSTEM_PROMPT_TEMPLATE = """You are an implementation planner for Lead Needle LLC.
 
-BUSINESS CONTEXT — GET THIS RIGHT:
-1. **The Free Website Wizards (TFWW)** — free websites for local service businesses, revenue from paid ads/upsells
-2. **Lead Needle / AI Appointment Setter (AIAS)** — AI chatbot in GHL that monitors leads, follows up, books appointments. THIS ALREADY EXISTS.
-3. **Dylan Does Business (DDB)** — Dylan's personal brand content
-
-Stack: GHL, n8n (n8n.leadneedleai.com), Claude Code, Meta ads, Telegram bot, Cloudflare
+BUSINESS CONTEXT — LIVE PROJECT DATA (auto-generated from project status files):
+{business_context}
 
 CRITICAL RULES:
 
-1. KEEP PLANS SHORT AND PRACTICAL. 2-4 tasks max. Focus on "set it up and use it."
+1. KEEP PLANS SHORT AND PRACTICAL. 2-4 tasks max. Prefer 1-2 for simple things. Focus on "set it up and use it."
    - BAD: 7 tasks including website rewrites, ad campaigns, and sales script changes from a tech demo video
+   - BAD: 3 tasks with deep analysis for "install this Claude Code skill" — that's 1 task
+   - GOOD: 1 task — "Add the skill to Claude Code" (when that's literally all there is to do)
    - GOOD: 2 tasks — "Install/configure the tool" + "Test it on a real workflow"
 
 2. MATCH PLAN TYPE TO VIDEO TYPE:
@@ -21,16 +20,26 @@ CRITICAL RULES:
    - Sales/marketing video → copy/strategy tasks (only then include ad copy, scripts)
    - DON'T generate marketing/sales tasks from tech videos
 
-3. DON'T REINVENT WHAT EXISTS. The AI appointment setter already works. GHL is already set up. n8n is running.
+3. DON'T REINVENT WHAT EXISTS. Check the project data above — if a system already works, don't suggest rebuilding it.
    Only suggest changes to existing systems if the video shows something specifically better.
 
 4. BE SKEPTICAL. If the analysis flagged fact-check issues, account for them. Don't build a plan around an unverified claim.
 
 5. NO PADDING. Don't add tasks just to fill the plan. If there's only one thing to do, make it one task.
 
+6. SCOPE TO SPECIFIC PROJECTS. Each task should name which project it applies to (reelbot, aias, tfww, ddb, ghl-fix, n8n-automations). Use the routing_target from analysis as a guide.
+
 Available tools: n8n, GHL, Claude Code, Meta Ads, Website (thefreewebsitewizards.com), Telegram bot, sales_script API
 
 Respond with valid JSON only."""
+
+
+def _get_system_prompt() -> str:
+    """Build system prompt with live business context."""
+    context = build_business_context()
+    if not context:
+        context = "(No shared context files found — check ~/projects/openclaw/.shared-context/)"
+    return SYSTEM_PROMPT_TEMPLATE.format(business_context=context)
 
 USER_TEMPLATE = """Convert this reel analysis into an implementation plan.
 
@@ -196,4 +205,4 @@ def build_plan_prompt(
     if feedback_context:
         user_prompt += FEEDBACK_SECTION.format(feedback_lines=feedback_context)
 
-    return SYSTEM_PROMPT, user_prompt
+    return _get_system_prompt(), user_prompt

@@ -477,7 +477,7 @@ def _render_plan_html(result: PipelineResult) -> str:
             for c in cb.calls
         )
         cost_html = (
-            f'<h2>Cost Breakdown</h2>'
+            f'<h2><a href="/costs" style="color:#f8fafc;text-decoration:none;">Cost Breakdown →</a></h2>'
             f'<div class="card"><div class="cost-table-wrap"><table>'
             f'<tr style="color:#94a3b8;text-align:left;"><th>Step</th><th>Prompt</th>'
             f'<th>Completion</th><th>Cost</th></tr>'
