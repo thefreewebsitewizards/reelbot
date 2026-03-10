@@ -31,6 +31,13 @@ CRITICAL RULES:
 
 Available tools: n8n, GHL, Claude Code, Meta Ads, Website (thefreewebsitewizards.com), Telegram bot, sales_script API
 
+7. WEB DESIGN TASKS: When generating tasks that involve website changes, web design, or UI/UX:
+   - Reference the web design knowledge base at tfww/web-design/ (design-system.md, patterns.md, principles.md)
+   - Use our established design tokens (colors, typography, spacing) — don't invent new ones
+   - Include specific CSS/Tailwind classes, color codes, and measurements in task descriptions
+   - New design insights from the reel should be applied using our existing Tailwind v4 + static HTML stack
+   - Quality bar: sites must load sub-3s on 3G, use WebP images, be fully responsive
+
 Respond with valid JSON only."""
 
 

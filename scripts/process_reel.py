@@ -75,6 +75,22 @@ def main():
         plan_dir = write_plan(result)
         print(f"\n✓ Plan saved to: {plan_dir}")
 
+        # Distribute insights to project folders
+        from src.utils.insight_distributor import distribute_insights
+        distributions = distribute_insights(
+            category=analysis.category,
+            key_insights=analysis.key_insights,
+            web_design_insights=getattr(analysis, 'web_design_insights', []),
+            reel_id=reel_id,
+            theme=analysis.theme,
+            creator=metadata.creator,
+            source_url=url,
+        )
+        if distributions:
+            print(f"\n✓ Distributed insights:")
+            for d in distributions:
+                print(f"  → {d['project']}/{d['folder']} ({d['insight_count']} insights)")
+
     finally:
         cleanup_temp_dir(reel_id)
 

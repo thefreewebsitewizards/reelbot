@@ -102,7 +102,7 @@ def _read_plan_title(plan_dir_name: str) -> str:
 
 
 def _process_queue_item(item: dict) -> None:
-    """Transition a single approved plan to in_progress."""
+    """Execute a single approved plan."""
     reel_id = item.get("reel_id", "")
     plan_dir_name = item.get("plan_dir", "")
 
@@ -111,19 +111,18 @@ def _process_queue_item(item: dict) -> None:
         return
 
     plan_title = _read_plan_title(plan_dir_name) if plan_dir_name else "(no plan_dir)"
+    logger.info(f"Executing approved plan: {reel_id} (title={plan_title})")
 
-    logger.info(
-        f"Processing approved plan: {reel_id} "
-        f"(dir={plan_dir_name}, title={plan_title})"
-    )
-
-    updated = update_plan_status(reel_id, PlanStatus.IN_PROGRESS)
-    if not updated:
-        logger.warning(f"Could not update status for {reel_id} -- not found in index")
-        return
-
-    _send_telegram_notification(reel_id, plan_title)
-    logger.info(f"Plan {reel_id} is now in_progress")
+    from src.services.executor import execute_plan
+    try:
+        result = execute_plan(reel_id, plan_dir_name)
+        logger.info(
+            f"Plan {reel_id} execution done: "
+            f"{result.get('auto_count', 0)} auto, {result.get('human_count', 0)} human"
+        )
+    except Exception as e:
+        logger.error(f"Execution failed for {reel_id}: {e}")
+        update_plan_status(reel_id, PlanStatus.FAILED)
 
 
 def run_poll_loop() -> None:

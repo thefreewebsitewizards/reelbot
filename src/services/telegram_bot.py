@@ -86,6 +86,8 @@ async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "Commands:\n"
         "/approve — Approve the last plan (or /approve REEL_ID)\n"
         "/reject — Reject the last plan\n"
+        "/done — Mark human tasks complete (or /done REEL_ID)\n"
+        "/status — Show execution summary of all plans\n"
         "/plans — Show all plans and their status\n\n"
         "You can also tap the buttons under each plan, or reply to a plan with feedback to refine it."
     )
@@ -204,6 +206,43 @@ async def _handle_feedback(reel_id: str, rating: str, query):
         await query.message.reply_text(f"Thanks! Feedback saved as *{_esc(label)}*.", parse_mode="Markdown")
 
     logger.info(f"Feedback recorded for {reel_id}: {rating}")
+
+
+async def cmd_done(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Mark human tasks as done. Usage: /done or /done REEL_ID"""
+    chat_id = update.message.chat.id
+    args = context.args
+
+    if args:
+        reel_id = args[0]
+    elif chat_id in _last_reel:
+        reel_id = _last_reel[chat_id]
+    else:
+        await update.message.reply_text("Usage: /done REEL_ID")
+        return
+
+    entry = find_plan_by_id(reel_id)
+    if not entry:
+        await update.message.reply_text(f"Plan not found: {reel_id}")
+        return
+
+    if entry["status"] != "in_progress":
+        await update.message.reply_text(f"Plan '{entry['title']}' is {entry['status']}, not in_progress")
+        return
+
+    update_plan_status(reel_id, PlanStatus.COMPLETED)
+    await update.message.reply_text(
+        f"Completed: *{entry['title']}*\n\nAll tasks done.",
+        parse_mode="Markdown",
+    )
+
+
+async def cmd_status(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Show execution status of all plans."""
+    from src.services.executor import get_execution_summary
+
+    summary = get_execution_summary()
+    await update.message.reply_text(f"```\n{summary}\n```", parse_mode="Markdown")
 
 
 async def cmd_plans(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -836,6 +875,8 @@ def start_bot():
     _bot_app.add_handler(CommandHandler("start", cmd_start))
     _bot_app.add_handler(CommandHandler("approve", cmd_approve))
     _bot_app.add_handler(CommandHandler("reject", cmd_reject))
+    _bot_app.add_handler(CommandHandler("done", cmd_done))
+    _bot_app.add_handler(CommandHandler("status", cmd_status))
     _bot_app.add_handler(CommandHandler("plans", cmd_plans))
     _bot_app.add_handler(CallbackQueryHandler(handle_inline_button))
     _bot_app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))

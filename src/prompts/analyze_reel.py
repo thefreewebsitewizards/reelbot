@@ -97,7 +97,11 @@ Return JSON:
     }}
   ],
   "routing_target": "claude-upgrades|ddb|tfww|n8n-automations|ghl-fix|aias",
-  "relevance_score": 0.0-1.0
+  "relevance_score": 0.0-1.0,
+  "web_design_insights": [
+    "Specific web design tip, technique, or principle from this reel (if any)",
+    "CSS trick, layout pattern, UX principle, conversion optimization, etc."
+  ]
 }}
 
 Rules for routing_target — pick the SINGLE best folder for this reel's content:
@@ -108,6 +112,14 @@ Rules for routing_target — pick the SINGLE best folder for this reel's content
 - "ghl-fix" = GoHighLevel configuration, CRM setup, pipeline/funnel fixes
 - "aias" = AI appointment setting — AI chatbots, conversational AI, booking flows
 - If the reel spans multiple areas, pick the PRIMARY one that best matches the core topic
+
+Rules for web_design_insights:
+- Extract ANY web design knowledge: CSS techniques, layout strategies, typography tips, color theory, UX patterns, conversion optimization, responsive design, animation techniques, accessibility, performance, design tools
+- Include specifics: exact CSS properties, pixel values, font pairings, color codes, breakpoints, tool names
+- If the reel has NOTHING to do with web design, return an EMPTY array
+- These insights feed directly into our autonomous web design knowledge base
+- Frame as actionable techniques, not vague advice (e.g. "Use 16px minimum body text for readability" not "make text readable")
+- Maximum 10 insights per reel
 
 Rules for video_breakdown:
 - Write main_points as if you're taking notes on the video for someone who hasn't watched it
@@ -216,7 +228,10 @@ Return JSON with the same schema as a reel analysis. Adapt the fields:
   "swipe_phrases": ["Exact text from slides we can reuse"],
   "fact_checks": [],
   "routing_target": "claude-upgrades|ddb|tfww|n8n-automations|ghl-fix|aias",
-  "relevance_score": 0.0-1.0
+  "relevance_score": 0.0-1.0,
+  "web_design_insights": [
+    "Specific web design tip or technique from this carousel (if any)"
+  ]
 }}
 
 Rules for routing_target — pick the SINGLE best folder for this carousel's content:

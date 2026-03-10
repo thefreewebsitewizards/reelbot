@@ -22,6 +22,7 @@ from src.services.personal_brand import generate_personal_brand_plan
 from src.utils.file_ops import create_temp_dir, cleanup_temp_dir
 from src.utils.plan_writer import write_plan
 from src.utils.plan_manager import is_duplicate, get_index, save_index
+from src.utils.insight_distributor import distribute_insights
 
 router = APIRouter()
 
@@ -249,6 +250,23 @@ def _run_pipeline(reel_id: str, reel_url: str, user_context: str = "") -> None:
         save_index(index)
 
         write_plan(result)
+
+        # Distribute insights to all relevant project folders
+        distributions = distribute_insights(
+            category=analysis.category,
+            key_insights=analysis.key_insights,
+            web_design_insights=analysis.web_design_insights,
+            reel_id=reel_id,
+            theme=analysis.theme,
+            creator=metadata.creator,
+            source_url=metadata.url,
+        )
+        if distributions:
+            # Log distribution in the plan metadata
+            dist_path = settings.plans_dir / result.plan_dir / "distributions.json"
+            if dist_path.parent.exists():
+                import json as _json
+                dist_path.write_text(_json.dumps(distributions, indent=2))
 
         cleanup_temp_dir(reel_id)
 

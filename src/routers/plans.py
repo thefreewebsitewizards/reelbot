@@ -71,3 +71,25 @@ def update_status(reel_id: str, body: StatusUpdate):
 def summary():
     """Get a text summary of all plans."""
     return {"summary": get_execution_summary()}
+
+
+@router.post("/{reel_id}/execute")
+def execute_plan_endpoint(reel_id: str):
+    """Manually trigger execution of an approved plan."""
+    entry = find_plan_by_id(reel_id)
+    if not entry:
+        raise HTTPException(status_code=404, detail=f"Plan {reel_id} not found")
+    if entry["status"] != PlanStatus.APPROVED.value:
+        raise HTTPException(status_code=400, detail=f"Plan is {entry['status']}, must be approved")
+
+    from src.services.executor import execute_plan
+    import threading
+
+    thread = threading.Thread(
+        target=execute_plan,
+        args=(reel_id, entry["plan_dir"]),
+        daemon=True,
+    )
+    thread.start()
+
+    return {"status": "executing", "reel_id": reel_id}

@@ -41,6 +41,11 @@ def write_plan(result: PipelineResult) -> Path:
     plan_md = _format_plan_md(result)
     (plan_dir / "plan.md").write_text(plan_md)
 
+    # Write structured plan data for executor
+    (plan_dir / "plan.json").write_text(
+        json.dumps(result.plan.model_dump(), indent=2)
+    )
+
     # Write analysis-only quick-reference notes
     notes_md = _format_notes_md(result)
     (plan_dir / "notes.md").write_text(notes_md)

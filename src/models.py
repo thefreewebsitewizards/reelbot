@@ -76,6 +76,7 @@ class AnalysisResult(BaseModel):
     business_impact: str = ""
     fact_checks: list[FactCheck] = []
     routing_target: str = "tfww"
+    web_design_insights: list[str] = []
 
 
 class SimilarPlan(BaseModel):

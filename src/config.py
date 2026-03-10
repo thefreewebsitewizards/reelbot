@@ -9,7 +9,7 @@ class Settings(BaseSettings):
 
     # OpenRouter (LLM provider)
     openrouter_api_key: str = ""
-    openrouter_model: str = "google/gemini-2.5-pro"
+    openrouter_model: str = "moonshotai/kimi-k2.5"
     openrouter_base_url: str = "https://openrouter.ai/api/v1"
 
     # Per-step model overrides (leave blank to use openrouter_model)
