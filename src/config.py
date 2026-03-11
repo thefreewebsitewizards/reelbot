@@ -35,6 +35,7 @@ class Settings(BaseSettings):
     # Telegram
     telegram_bot_token: str = ""
     telegram_chat_id: str = ""  # Chat ID for similarity notifications from API route
+    enable_telegram_bot: bool = True  # Set False in local dev to avoid polling conflict
 
     # n8n
     n8n_execution_webhook: str = ""  # e.g. https://n8n.leadneedleai.com/webhook/plan-approved

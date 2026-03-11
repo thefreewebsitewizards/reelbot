@@ -55,8 +55,8 @@
       "position": [1000, 300],
       "credentials": {
         "telegramApi": {
-          "id": "TELEGRAM_CREDENTIAL_ID",
-          "name": "Telegram Bot"
+          "id": "WrFw1VexIphfKE6K",
+          "name": "LeadNeedle Bot"
         }
       }
     }

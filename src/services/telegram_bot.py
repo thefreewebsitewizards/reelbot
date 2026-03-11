@@ -2,6 +2,7 @@ import asyncio
 import json
 import re
 import threading
+import time
 from datetime import datetime
 from pathlib import Path
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
@@ -310,7 +311,19 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
         return
 
-    await update.message.reply_text("Processing your reel... this takes about 60-90 seconds.")
+    t0 = time.monotonic()
+    progress_msg = await update.message.reply_text(
+        "Downloading reel... (step 1/6)"
+    )
+
+    async def _progress(step: int, label: str):
+        elapsed = int(time.monotonic() - t0)
+        try:
+            await progress_msg.edit_text(
+                f"{label} (step {step}/6, {elapsed}s elapsed)"
+            )
+        except Exception:
+            pass  # edit can fail if text unchanged or rate-limited
 
     try:
         temp_dir = create_temp_dir(reel_id)
@@ -319,18 +332,24 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         download_result, metadata = download_reel(url, temp_dir)
 
         if metadata.content_type == "carousel":
+            await _progress(2, "Reading carousel images...")
             image_paths = download_result
             ocr_text = extract_text_from_images(image_paths)
             transcript = TranscriptResult(text=ocr_text, language="en")
+            await _progress(3, "Analyzing content...")
             analysis, analysis_cr = analyze_carousel(ocr_text, metadata, image_paths, user_context=user_context)
         else:
+            await _progress(2, "Extracting audio & frames...")
             video_path = download_result
             audio_path = extract_audio(video_path, temp_dir)
             frame_paths = extract_keyframes(video_path, temp_dir)
+            await _progress(3, "Transcribing audio...")
             transcript = transcribe(audio_path)
+            await _progress(4, "Analyzing content...")
             analysis, analysis_cr = analyze_reel(transcript, metadata, frame_paths, user_context=user_context)
         costs.add("analysis", analysis_cr.model, analysis_cr.prompt_tokens, analysis_cr.completion_tokens, analysis_cr.cost_usd, analysis_cr.generation_id)
 
+        await _progress(5, "Checking for similar plans...")
         similarity, sim_cr = check_plan_similarity(analysis)
         if sim_cr:
             costs.add("similarity", sim_cr.model, sim_cr.prompt_tokens, sim_cr.completion_tokens, sim_cr.cost_usd, sim_cr.generation_id)
@@ -341,6 +360,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             cleanup_temp_dir(reel_id)
             return
 
+        await _progress(6, "Generating plan...")
         plan, plan_cr = generate_plan(analysis, metadata, user_context=user_context)
         costs.add("plan", plan_cr.model, plan_cr.prompt_tokens, plan_cr.completion_tokens, plan_cr.cost_usd, plan_cr.generation_id)
 
@@ -461,8 +481,18 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             ],
         ])
 
+        # Delete progress message before sending summary
+        elapsed = int(time.monotonic() - t0)
+        try:
+            await progress_msg.delete()
+        except Exception:
+            pass
+
+        cost_line = _format_cost_line(costs)
+        summary_with_meta = f"{summary}{cost_line}\n\n_Processed in {elapsed}s_"
+
         summary_msg = await update.message.reply_text(
-            summary, parse_mode="Markdown", reply_markup=keyboard,
+            summary_with_meta, parse_mode="Markdown", reply_markup=keyboard,
         )
 
         # Track this message so replies to it trigger refinement
@@ -477,11 +507,12 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             )
             _plan_messages[doc_msg.message_id] = reel_id
 
-        logger.info(f"Telegram: sent plan for {reel_id}")
+        logger.info(f"Telegram: sent plan for {reel_id} in {elapsed}s")
 
     except Exception as e:
-        logger.error(f"Telegram pipeline failed: {e}")
-        await update.message.reply_text(f"Failed to process reel: {e}")
+        elapsed = int(time.monotonic() - t0)
+        logger.error(f"Telegram pipeline failed after {elapsed}s: {e}")
+        await update.message.reply_text(f"Failed to process reel ({elapsed}s): {e}")
 
 
 def _save_analysis_for_resume_telegram(
@@ -867,6 +898,10 @@ def start_bot():
 
     if not settings.telegram_bot_token:
         logger.warning("TELEGRAM_BOT_TOKEN not set, skipping bot startup")
+        return
+
+    if not settings.enable_telegram_bot:
+        logger.info("ENABLE_TELEGRAM_BOT=false, skipping bot startup (use this in local dev)")
         return
 
     logger.info("Starting Telegram bot...")

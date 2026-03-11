@@ -46,7 +46,7 @@
     {
       "parameters": {
         "chatId": "={{ $('Telegram Trigger').item.json.message.chat.id }}",
-        "text": "⏳ Processing your reel... This takes about 30-60 seconds.",
+        "text": "⏳ Processing your reel... This usually takes about 2 minutes.",
         "additionalFields": {}
       },
       "id": "send-processing",

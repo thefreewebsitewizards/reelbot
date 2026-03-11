@@ -1,66 +1,42 @@
-# Session Handoff — 2026-03-11 (Session 12)
+# Session Handoff — 2026-03-11 (Session 13)
 
 ## Project Overview
-- Instagram Reel -> Business Strategy Pipeline (FastAPI + Telegram bot + OpenRouter LLM)
+- Instagram Reel → Business Strategy Pipeline (FastAPI + Telegram + OpenRouter LLM)
 - Ref: `CLAUDE.md` for full architecture, commands, execution rules
 
 ## Completed This Session
 
-### E2E execution tested and verified:
-- Approved a local plan → executor thread fired in background
-- Auto task (sales_script) ran and completed via handler
-- Human tasks correctly flagged as `needs_human`
-- External agent flow tested: `PATCH /plans/{id}/tasks/{index}` updates execution log
-- n8n webhook fired on approval (`N8N_EXECUTION_WEBHOOK`)
-- Plan status transitions: review → approved → in_progress (correct lifecycle)
+### Bug Fix: Telegram Bot Polling Conflict
+- Local dev server was competing with production for Telegram bot polling (same token, two instances)
+- Telegram only allows one poller per token — local server was "winning" and swallowing messages
+- **Fix**: Added `ENABLE_TELEGRAM_BOT` setting (default: `True`). Set `False` in local `.env`
+- Gate in `start_bot()` checks this before starting the polling thread
 
-### GitHub Actions auto-deploy:
-- Created `.github/workflows/deploy.yml` — triggers Coolify build on push to main
-- Coolify branch updated from `deploy` → `main` (no more deploy branch needed)
-- `COOLIFY_API_TOKEN` added as GitHub repo secret
-- Deploy script updated to push to `main` instead of `main:deploy`
-- Workflow: push to main → GitHub Action → Coolify API → build + poll + health check
+### Dynamic Processing Time
+- Replaced static "60-90 seconds" message with live progress updates
+- Telegram message now updates at each pipeline step: download → extract → transcribe → analyze → similarity → plan
+- Shows step number (1/6) and elapsed seconds
+- Final summary includes actual processing time: `_Processed in {elapsed}s_`
+- Also shows cost breakdown in the final Telegram summary message
+- Updated n8n workflow estimate to "about 2 minutes" (was 30-60s)
 
-### OpenClaw/n8n integration:
-- `N8N_EXECUTION_WEBHOOK=https://n8n.leadneedleai.com/webhook/plan-approved` set in master.env + .env
-- On plan approval, ReelBot POSTs `{reel_id, plan_dir}` to n8n webhook
-- Verified webhook fires in e2e test
+### n8n Workflow Imported via API
+- Used CF_ACCESS_CLIENT_ID/SECRET to bypass Cloudflare Access programmatically
+- Imported `n8n/workflow-plan-approved.json` via n8n REST API
+- Linked Telegram credential (`WrFw1VexIphfKE6K` / "LeadNeedle Bot")
+- Workflow activated — fires on plan approval webhook
+- Updated repo JSON with correct credential ID
 
-### Previous session work (still deployed):
-- Execution handlers: sales_script (auto), content drafts (auto), n8n specs (auto)
-- Task-level API for agents: GET /plans/{id}/tasks, PATCH /plans/{id}/tasks/{index}
-- Actual costs resolved from OpenRouter before writing plan artifacts
-- 61 tests passing
-
-## Execution flow for Claude Code / OpenClaw:
-```
-1. GET /plans/approved → list approved plans
-2. GET /plans/{id}/tasks → get tasks with status
-3. For each pending task:
-   - Read tool_data for structured instructions
-   - Execute (update script section, write code, create content)
-   - PATCH /plans/{id}/tasks/{index} with {status: "completed", notes: "..."}
-4. Plan auto-completes when all auto tasks are done
-```
-
-## Priority Next Steps
-
-### 1. Deploy and test in production
-- Push to main to trigger first GitHub Actions deploy
-- Approve one of the 11 review plans on production
-- Verify n8n receives webhook POST
-
-### 2. Create n8n workflow for plan-approved webhook
-- Webhook trigger at `https://n8n.leadneedleai.com/webhook/plan-approved`
-- Should route to OpenClaw (Discord notification or direct execution)
-- Payload: `{reel_id, plan_dir}` → fetch tasks → dispatch
-
-### 3. Production monitoring
-- Check execution logs after approval
-- Verify Telegram notifications work for human tasks
+## Next Steps
+- [x] ~~Import n8n workflow~~ — done via API
+- [ ] **Test recalibrated plans** — resend a reel now that Telegram conflict is fixed
+- [ ] **Wire OpenClaw** — deploy `agent_loop.py` on OpenClaw VPS, configure REELBOT_URL + REELBOT_API_KEY
+- [ ] **Review remaining 10 prod plans** — approve via Telegram, verify execution
+- [ ] **Add knowledge_base tool** — for "save for later" tasks that file insights into project docs
 
 ## Context Notes
-- Deploy: `./scripts/deploy.sh` or just push to main (GitHub Actions)
-- Coolify app UUID: `l0g48c8g4wsskc40co4kssc8`, branch: `main`
-- n8n webhook: `https://n8n.leadneedleai.com/webhook/plan-approved`
-- 61 tests passing locally
+- Coolify API token has `|` char — use `grep + cut -d= -f2-`, not `source`
+- Coolify deployments list API returns empty — workflow uses health check polling instead
+- CF Access bypass: `CF-Access-Client-Id` + `CF-Access-Client-Secret` headers work for n8n API
+- 10 plans in review on prod, 1 completed
+- Local `.env` now has `ENABLE_TELEGRAM_BOT=false` — safe for local dev
