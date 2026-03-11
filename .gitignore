@@ -28,6 +28,16 @@ tmp/
 # OS
 .DS_Store
 Thumbs.db
+*:Zone.Identifier
+
+# Windows dev files
+*.reg
+
+# Debug logs
+telegramlogs.txt
+
+# Claude Code
+.claude/
 
 # Whisper model cache
 whisper_models/

@@ -1,0 +1,109 @@
+{
+  "name": "ReelBot Plan Approved → Notify",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "plan-approved",
+        "responseMode": "onReceived",
+        "responseData": "allEntries",
+        "options": {}
+      },
+      "id": "webhook-trigger",
+      "name": "Plan Approved Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [250, 300],
+      "webhookId": "plan-approved"
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "=https://reelbot.leadneedleai.com/plans/{{ $json.body.reel_id }}/tasks",
+        "options": {
+          "timeout": 10000
+        }
+      },
+      "id": "fetch-tasks",
+      "name": "Fetch Plan Tasks",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [500, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "const webhook = $('Plan Approved Webhook').first().json.body;\nconst tasksData = $input.first().json;\n\nconst reelId = webhook.reel_id;\nconst planDir = webhook.plan_dir;\nconst title = tasksData.title || `Plan: ${reelId}`;\nconst tasks = tasksData.tasks || [];\n\nconst autoTasks = tasks.filter(t => !t.requires_human);\nconst humanTasks = tasks.filter(t => t.requires_human);\n\nlet taskList = tasks.map(t => {\n  const icon = t.requires_human ? '👤' : '🤖';\n  return `${icon} ${t.index + 1}. ${t.title} [${t.tools.join(', ')}]`;\n}).join('\\n');\n\nconst message = `*✅ Plan Approved*\\n\\n` +\n  `*${title}*\\n\\n` +\n  `🤖 Auto tasks: ${autoTasks.length}\\n` +\n  `👤 Human tasks: ${humanTasks.length}\\n\\n` +\n  `${taskList}\\n\\n` +\n  `📋 Tasks API: \\`GET /plans/${reelId}/tasks\\`\\n` +\n  `🔗 View: https://reelbot.leadneedleai.com/plans/${reelId}/view`;\n\nreturn [{ json: { message, reelId, title, taskCount: tasks.length } }];"
+      },
+      "id": "format-message",
+      "name": "Format Notification",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [750, 300]
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $env.TELEGRAM_CHAT_ID }}",
+        "text": "={{ $json.message }}",
+        "additionalFields": {
+          "parse_mode": "Markdown"
+        }
+      },
+      "id": "send-telegram",
+      "name": "Send Telegram Notification",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [1000, 300],
+      "credentials": {
+        "telegramApi": {
+          "id": "TELEGRAM_CREDENTIAL_ID",
+          "name": "Telegram Bot"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Plan Approved Webhook": {
+      "main": [
+        [
+          {
+            "node": "Fetch Plan Tasks",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Plan Tasks": {
+      "main": [
+        [
+          {
+            "node": "Format Notification",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format Notification": {
+      "main": [
+        [
+          {
+            "node": "Send Telegram Notification",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {},
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "staticData": null,
+  "tags": [
+    {
+      "name": "reelbot"
+    }
+  ]
+}
