@@ -9,25 +9,37 @@ BUSINESS CONTEXT — LIVE PROJECT DATA (auto-generated from project status files
 
 CRITICAL RULES:
 
-1. KEEP PLANS SHORT AND PRACTICAL. 2-4 tasks max. Prefer 1-2 for simple things. Focus on "set it up and use it."
-   - BAD: 7 tasks including website rewrites, ad campaigns, and sales script changes from a tech demo video
-   - BAD: 3 tasks with deep analysis for "install this Claude Code skill" — that's 1 task
-   - GOOD: 1 task — "Add the skill to Claude Code" (when that's literally all there is to do)
-   - GOOD: 2 tasks — "Install/configure the tool" + "Test it on a real workflow"
+1. MOST VIDEOS ARE SMALL. The typical output is 1 task — sometimes just a note. Don't overthink it.
+   - Sales advice → often just "add a note to the sales script about X tone/phrase"
+   - New tool → "install/add this tool to the project"
+   - Future idea → "add this to the knowledge base for reference when we build X"
+   - Only create multi-task plans (2-3 max) when the video genuinely warrants it
 
-2. MATCH PLAN TYPE TO VIDEO TYPE:
+2. PLAN TYPES — match the output to what's actually useful:
+   - "add a note" — Just append guidance to the sales script, knowledge base, or project docs. Use tool "sales_script" with a note, not a rewrite.
+   - "install a tool" — One task: add it, configure it, done.
+   - "save for later" — File it in the right place (knowledge base, shared context) so it's referenced when needed.
+   - "small tweak" — A single targeted change to an existing system.
+   - "real implementation" — Only when the video shows a complete workflow worth building. Even then, 2-3 tasks max.
+
+3. DON'T OVER-ENGINEER. These are Instagram reels, not gospel.
+   - BAD: 7 tasks from a 60-second video about a sales technique
+   - BAD: Rewriting the sales script because someone mentioned "use urgency"
+   - BAD: Creating ad campaigns, website changes, AND script updates from one video
+   - GOOD: 1 task — "Add a note to the sales script intro: lead with the client's biggest bottleneck"
+   - GOOD: 1 task — "Install scraping-tool-x in the project and test on one URL"
+   - GOOD: 2 tasks — only when there are genuinely two separate things to do
+
+4. MATCH PLAN TYPE TO VIDEO TYPE:
    - Tech tool/update video → implementation tasks (install, configure, test)
-   - Sales/marketing video → copy/strategy tasks (only then include ad copy, scripts)
+   - Sales/marketing video → notes or small copy tweaks (NOT full rewrites)
    - DON'T generate marketing/sales tasks from tech videos
 
-3. DON'T REINVENT WHAT EXISTS. Check the project data above — if a system already works, don't suggest rebuilding it.
-   Only suggest changes to existing systems if the video shows something specifically better.
+5. DON'T REINVENT WHAT EXISTS. Check the project data above — if a system already works, don't suggest rebuilding it.
 
-4. BE SKEPTICAL. If the analysis flagged fact-check issues, account for them. Don't build a plan around an unverified claim.
+6. BE SKEPTICAL. If the analysis flagged fact-check issues, account for them.
 
-5. NO PADDING. Don't add tasks just to fill the plan. If there's only one thing to do, make it one task.
-
-6. SCOPE TO SPECIFIC PROJECTS. Each task should name which project it applies to (reelbot, aias, tfww, ddb, ghl-fix, n8n-automations). Use the routing_target from analysis as a guide.
+7. SCOPE TO SPECIFIC PROJECTS. Each task should name which project it applies to (reelbot, aias, tfww, ddb, ghl-fix, n8n-automations).
 
 Available tools: n8n, GHL, Claude Code, Meta Ads, Website (thefreewebsitewizards.com), Telegram bot, sales_script API
 
@@ -90,10 +102,10 @@ Return JSON:
 }}
 
 Rules:
-- MAXIMUM 4 tasks. Prefer 2-3. Only include what's actually worth doing.
+- PREFER 1 TASK. Most reels only need one thing done. 2-3 tasks ONLY if genuinely separate work items. Never more than 3.
+- "Add a note" IS a valid task. Adding guidance to the sales script, knowledge base, or docs counts as a deliverable.
 - Order tasks by priority (high first) then by dependency
-- Each task must have at least one concrete deliverable
-- Estimated hours should be realistic (0.5 - 4 hours per task)
+- Estimated hours should be realistic (0.25 for a note, 0.5-2 for a small task, 2-4 for real implementation)
 - Every task must use at least one of our available tools
 - Do NOT duplicate tasks from existing plans (see below)
 - Do NOT generate website copy changes or ad campaigns from tech/tool videos
@@ -103,9 +115,10 @@ Rules:
 
 Rules for tool_data — THIS IS CRITICAL for automated execution:
 - WITHOUT tool_data, tasks just get logged and nothing actually happens
-- For "sales_script" tasks: MUST include {{"section_id": "<valid_id>", "new_content": "The COMPLETE replacement text ready to apply as-is"}}
+- For "sales_script" tasks — two modes:
+  - FULL REWRITE: {{"section_id": "<valid_id>", "new_content": "The COMPLETE replacement text"}} — only for major changes
+  - ADD A NOTE: {{"section_id": "<valid_id>", "note": "Brief guidance to add — e.g. 'Lead with the client's biggest bottleneck before pitching'"}} — for tone/approach notes
   - section_id MUST match a valid ID from the script sections listed below
-  - new_content must be the FULL section text, not a diff or summary — write out every word
 - For "content" tasks (meta_ads, email, social_media): MUST include {{"content_type": "ad_copy|email|social_post", "drafts": ["Complete draft 1...", "Complete draft 2..."]}}
   - Each draft must be complete, ready-to-use copy — headlines, body, CTAs, everything
   - Include 2-3 variations when possible

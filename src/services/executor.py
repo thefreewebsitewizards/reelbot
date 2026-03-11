@@ -106,6 +106,16 @@ def _handle_sales_script(task: dict, tool_data: dict, plan_dir: str) -> str:
     if existing is None:
         return f"[sales_script] Section '{section_id}' not found — skipped"
 
+    note = tool_data.get("note", "")
+
+    if note and not new_content:
+        # Append a note to the section rather than replacing it
+        current = existing.get("content", "") if isinstance(existing, dict) else str(existing)
+        appended = f"{current}\n\n📝 Note: {note}"
+        update_section(section_id, appended)
+        logger.info(f"Added note to sales script section '{section_id}'")
+        return f"[sales_script] Added note to section '{section_id}': {note[:80]}"
+
     if not new_content:
         return f"[sales_script] Section '{section_id}' found but no new_content provided — logged for manual update"
 
