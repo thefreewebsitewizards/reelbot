@@ -228,6 +228,8 @@ def _run_pipeline(reel_id: str, reel_url: str, user_context: str = "") -> None:
         personal_brand_plan, pb_cr = generate_personal_brand_plan(analysis, metadata, transcript.text)
         costs.add("personal_brand", pb_cr.model, pb_cr.prompt_tokens, pb_cr.completion_tokens, pb_cr.cost_usd, pb_cr.generation_id)
 
+        costs.resolve_actual_costs()
+
         result = PipelineResult(
             reel_id=reel_id,
             status=PlanStatus.REVIEW,
