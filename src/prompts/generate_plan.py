@@ -83,7 +83,8 @@ Return JSON:
       "dependencies": ["Other task title if needed — state what output is used"],
       "tools": ["n8n", "ghl", "claude_code", "meta_ads", "website"],
       "requires_human": false,
-      "human_reason": ""
+      "human_reason": "",
+      "tool_data": {{}}
     }}
   ]
 }}
@@ -98,7 +99,15 @@ Rules:
 - Do NOT generate website copy changes or ad campaigns from tech/tool videos
 - Do NOT suggest rebuilding things that already work (AI appointment setter, GHL setup, n8n workflows)
 - Set requires_human=true only for tasks needing real human judgment (ad spend, client outreach). Explain why.
-- If fact checks flagged issues, either skip that aspect or note the correction"""
+- If fact checks flagged issues, either skip that aspect or note the correction
+
+Rules for tool_data (structured data for automated execution):
+- For "sales_script" tasks: include {{"section_id": "intro", "new_content": "The exact replacement text..."}}
+  - section_id MUST match a valid ID from the script sections listed below
+  - new_content must be the COMPLETE replacement text, ready to apply as-is
+- For "content" tasks (meta_ads, email, social posts): include {{"content_type": "ad_copy|email|social_post", "drafts": ["Draft 1 text...", "Draft 2 text..."]}}
+- For other tools: leave tool_data as empty {{}}
+- tool_data enables automated execution — without it, tasks just get logged"""
 
 EXISTING_PLANS_SECTION = """
 

@@ -102,6 +102,7 @@ class PlanTask(BaseModel):
     tools: list[str] = []
     requires_human: bool = False
     human_reason: str = ""
+    tool_data: dict = {}  # Structured data for automated execution (e.g. section_id, content)
 
 
 class ImplementationPlan(BaseModel):

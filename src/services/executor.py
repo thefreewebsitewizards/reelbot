@@ -52,14 +52,14 @@ def load_plan(plan_dir_name: str) -> dict:
 
 
 def _execute_auto_task(task: dict, plan_dir: str, task_index: int) -> dict:
-    """Execute a single auto task. Returns execution result.
+    """Execute a single auto task using tool-specific handlers.
 
-    For now, logs what would be done. Real execution handlers
-    will be added per tool type as we validate the system.
+    Dispatches to handler based on the task's tools list. Falls back to
+    logging for tools without a handler.
     """
     title = task.get("title", "Untitled")
     tools = task.get("tools", [])
-    description = task.get("description", "")
+    tool_data = task.get("tool_data", {})
 
     logger.info(f"Executing task {task_index}: {title} (tools: {tools})")
 
@@ -68,25 +68,121 @@ def _execute_auto_task(task: dict, plan_dir: str, task_index: int) -> dict:
         "title": title,
         "status": "completed",
         "tools": tools,
-        "notes": f"Auto-executed: {description[:200]}",
+        "notes": "",
         "executed_at": datetime.now().isoformat(),
     }
 
+    handler_results = []
     for tool in tools:
-        if tool == "sales_script":
-            result["notes"] = f"Sales script update ready: {description[:200]}"
-        elif tool == "claude_code":
-            result["notes"] = f"Code task queued: {description[:200]}"
-        elif tool == "n8n":
-            result["notes"] = f"n8n workflow task: {description[:200]}"
-        elif tool == "website":
-            result["notes"] = f"Website update: {description[:200]}"
-        elif tool == "ghl":
-            result["notes"] = f"GHL config task: {description[:200]}"
-        elif tool in ("deploy", "vps"):
-            result["notes"] = f"Infrastructure task: {description[:200]}"
+        handler = _TOOL_HANDLERS.get(tool)
+        if handler:
+            handler_results.append(handler(task, tool_data, plan_dir))
+        else:
+            handler_results.append(f"[{tool}] No handler — logged only")
 
+    result["notes"] = "; ".join(handler_results) if handler_results else "No tools to execute"
     return result
+
+
+def _handle_sales_script(task: dict, tool_data: dict, plan_dir: str) -> str:
+    """Execute a sales_script update using tool_data or regex fallback."""
+    from src.utils.script_manager import update_section, get_section
+    import re
+
+    section_id = tool_data.get("section_id", "")
+    new_content = tool_data.get("new_content", "")
+
+    # Fallback: try to extract section_id from description/deliverables
+    if not section_id:
+        text = task.get("description", "") + " ".join(task.get("deliverables", []))
+        match = re.search(r'/api/script/sections/(\w+)', text)
+        if match:
+            section_id = match.group(1)
+
+    if not section_id:
+        return "[sales_script] No section_id in tool_data or description — skipped"
+
+    existing = get_section(section_id)
+    if existing is None:
+        return f"[sales_script] Section '{section_id}' not found — skipped"
+
+    if not new_content:
+        return f"[sales_script] Section '{section_id}' found but no new_content provided — logged for manual update"
+
+    update_section(section_id, new_content)
+    logger.info(f"Updated sales script section '{section_id}'")
+    return f"[sales_script] Updated section '{section_id}'"
+
+
+def _handle_content(task: dict, tool_data: dict, plan_dir: str) -> str:
+    """Save content drafts (ad copy, emails, social posts) to files."""
+    drafts = tool_data.get("drafts", [])
+    content_type = tool_data.get("content_type", "content")
+
+    if not drafts:
+        # Fall back to deliverables as draft content
+        drafts = task.get("deliverables", [])
+
+    if not drafts:
+        return f"[content] No drafts in tool_data or deliverables — skipped"
+
+    output_dir = Path(plan_dir) / "drafts"
+    output_dir.mkdir(exist_ok=True)
+
+    filename = f"{content_type}_{task.get('title', 'untitled')[:40]}.md".replace(" ", "_").lower()
+    filepath = output_dir / filename
+
+    lines = [f"# {task.get('title', 'Untitled')}", ""]
+    for i, draft in enumerate(drafts, 1):
+        if len(drafts) > 1:
+            lines.append(f"## Draft {i}")
+        lines.append(draft)
+        lines.append("")
+
+    filepath.write_text("\n".join(lines))
+    logger.info(f"Saved {len(drafts)} draft(s) to {filepath}")
+    return f"[content] Saved {len(drafts)} draft(s) to drafts/{filename}"
+
+
+def _handle_code_task(task: dict, tool_data: dict, plan_dir: str) -> str:
+    """Log code tasks — these need Claude Code to execute."""
+    return f"[claude_code] Logged for Claude Code execution: {task.get('description', '')[:150]}"
+
+
+def _handle_n8n(task: dict, tool_data: dict, plan_dir: str) -> str:
+    """Save n8n workflow description for manual import."""
+    output_dir = Path(plan_dir) / "drafts"
+    output_dir.mkdir(exist_ok=True)
+
+    filename = f"n8n_{task.get('title', 'workflow')[:40]}.md".replace(" ", "_").lower()
+    filepath = output_dir / filename
+
+    lines = [
+        f"# n8n Workflow: {task.get('title', 'Untitled')}",
+        "",
+        "## Description",
+        task.get("description", ""),
+        "",
+        "## Deliverables",
+    ]
+    for d in task.get("deliverables", []):
+        lines.append(f"- {d}")
+
+    filepath.write_text("\n".join(lines))
+    logger.info(f"Saved n8n workflow spec to {filepath}")
+    return f"[n8n] Saved workflow spec to drafts/{filename}"
+
+
+# Tool handler dispatch table
+_TOOL_HANDLERS = {
+    "sales_script": _handle_sales_script,
+    "meta_ads": _handle_content,
+    "email": _handle_content,
+    "social_media": _handle_content,
+    "content": _handle_content,
+    "claude_code": _handle_code_task,
+    "n8n": _handle_n8n,
+}
 
 
 def _notify_human_tasks(reel_id: str, plan_title: str, human_tasks: list[dict]) -> None:

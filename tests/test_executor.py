@@ -1,6 +1,10 @@
 import json
+from pathlib import Path
 from unittest.mock import patch, MagicMock
-from src.services.executor import classify_task, execute_plan
+from src.services.executor import (
+    classify_task, execute_plan,
+    _handle_sales_script, _handle_content, _handle_n8n, _handle_code_task,
+)
 
 
 def test_classify_task_auto():
@@ -60,3 +64,97 @@ def test_execute_plan_no_plan_json(tmp_path):
 
     assert result["auto_count"] == 0
     assert "error" in result
+
+
+class TestHandleSalesScript:
+    def test_should_update_section_with_tool_data(self):
+        task = {"title": "Update intro", "description": "Change intro", "deliverables": []}
+        tool_data = {"section_id": "intro", "new_content": "New intro text"}
+
+        with patch("src.utils.script_manager.update_section") as mock_update, \
+             patch("src.utils.script_manager.get_section", return_value={"id": "intro", "content": "old"}):
+            result = _handle_sales_script(task, tool_data, "/tmp/plan")
+
+        mock_update.assert_called_once_with("intro", "New intro text")
+        assert "Updated section 'intro'" in result
+
+    def test_should_extract_section_id_from_description(self):
+        task = {
+            "title": "Update intro",
+            "description": "Use PUT /api/script/sections/intro to update",
+            "deliverables": [],
+        }
+        tool_data = {}
+
+        with patch("src.utils.script_manager.get_section", return_value={"id": "intro"}):
+            result = _handle_sales_script(task, tool_data, "/tmp/plan")
+
+        assert "no new_content" in result
+
+    def test_should_skip_when_no_section_id(self):
+        task = {"title": "Update script", "description": "Vague update", "deliverables": []}
+        result = _handle_sales_script(task, {}, "/tmp/plan")
+        assert "No section_id" in result
+
+    def test_should_skip_when_section_not_found(self):
+        task = {"title": "Update intro", "description": "", "deliverables": []}
+        tool_data = {"section_id": "nonexistent", "new_content": "text"}
+
+        with patch("src.utils.script_manager.get_section", return_value=None):
+            result = _handle_sales_script(task, tool_data, "/tmp/plan")
+
+        assert "not found" in result
+
+
+class TestHandleContent:
+    def test_should_save_drafts_from_tool_data(self, tmp_path):
+        task = {"title": "Create Ad Copy", "deliverables": []}
+        tool_data = {"content_type": "ad_copy", "drafts": ["Draft headline 1", "Draft headline 2"]}
+
+        result = _handle_content(task, tool_data, str(tmp_path))
+
+        assert "Saved 2 draft(s)" in result
+        drafts_dir = tmp_path / "drafts"
+        assert drafts_dir.exists()
+        files = list(drafts_dir.glob("*.md"))
+        assert len(files) == 1
+        content = files[0].read_text()
+        assert "Draft headline 1" in content
+        assert "Draft headline 2" in content
+
+    def test_should_fall_back_to_deliverables(self, tmp_path):
+        task = {"title": "Write Email", "deliverables": ["Subject: Hello", "Body: World"]}
+        tool_data = {}
+
+        result = _handle_content(task, tool_data, str(tmp_path))
+
+        assert "Saved 2 draft(s)" in result
+
+    def test_should_skip_when_no_content(self, tmp_path):
+        task = {"title": "Empty task", "deliverables": []}
+        result = _handle_content(task, {}, str(tmp_path))
+        assert "skipped" in result
+
+
+class TestHandleN8n:
+    def test_should_save_workflow_spec(self, tmp_path):
+        task = {
+            "title": "Lead nurture flow",
+            "description": "Create an n8n workflow for lead nurture",
+            "deliverables": ["Webhook trigger", "Email node"],
+        }
+
+        result = _handle_n8n(task, {}, str(tmp_path))
+
+        assert "Saved workflow spec" in result
+        files = list((tmp_path / "drafts").glob("n8n_*.md"))
+        assert len(files) == 1
+        content = files[0].read_text()
+        assert "lead nurture" in content.lower()
+
+
+class TestHandleCodeTask:
+    def test_should_log_task(self):
+        task = {"title": "Fix bug", "description": "Fix the login bug in auth.py"}
+        result = _handle_code_task(task, {}, "/tmp/plan")
+        assert "Logged for Claude Code" in result
