@@ -39,6 +39,9 @@ class Settings(BaseSettings):
     # n8n
     n8n_execution_webhook: str = ""  # e.g. https://n8n.leadneedleai.com/webhook/plan-approved
 
+    # Auth
+    reelbot_api_key: str = ""  # Required for write operations on plans
+
     # Server
     host: str = "127.0.0.1"
     port: int = 8000

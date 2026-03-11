@@ -101,13 +101,18 @@ Rules:
 - Set requires_human=true only for tasks needing real human judgment (ad spend, client outreach). Explain why.
 - If fact checks flagged issues, either skip that aspect or note the correction
 
-Rules for tool_data (structured data for automated execution):
-- For "sales_script" tasks: include {{"section_id": "intro", "new_content": "The exact replacement text..."}}
+Rules for tool_data — THIS IS CRITICAL for automated execution:
+- WITHOUT tool_data, tasks just get logged and nothing actually happens
+- For "sales_script" tasks: MUST include {{"section_id": "<valid_id>", "new_content": "The COMPLETE replacement text ready to apply as-is"}}
   - section_id MUST match a valid ID from the script sections listed below
-  - new_content must be the COMPLETE replacement text, ready to apply as-is
-- For "content" tasks (meta_ads, email, social posts): include {{"content_type": "ad_copy|email|social_post", "drafts": ["Draft 1 text...", "Draft 2 text..."]}}
-- For other tools: leave tool_data as empty {{}}
-- tool_data enables automated execution — without it, tasks just get logged"""
+  - new_content must be the FULL section text, not a diff or summary — write out every word
+- For "content" tasks (meta_ads, email, social_media): MUST include {{"content_type": "ad_copy|email|social_post", "drafts": ["Complete draft 1...", "Complete draft 2..."]}}
+  - Each draft must be complete, ready-to-use copy — headlines, body, CTAs, everything
+  - Include 2-3 variations when possible
+- For "n8n" tasks: include {{"workflow_description": "What the workflow does", "trigger": "webhook|schedule|manual", "steps": ["Step 1...", "Step 2..."]}}
+- For "claude_code" tasks: include {{"files_to_modify": ["path/to/file.py"], "change_description": "What to change and why"}}
+- For "website" tasks: include {{"page": "homepage|about|pricing", "changes": ["Change 1...", "Change 2..."]}}
+- Every task MUST have populated tool_data — empty {{}} means the task cannot be auto-executed"""
 
 EXISTING_PLANS_SECTION = """
 

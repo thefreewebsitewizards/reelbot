@@ -1,12 +1,13 @@
 import json
 from pathlib import Path
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import HTMLResponse
 from pydantic import BaseModel
 
 from src.config import settings
 from src.models import PlanStatus
+from src.utils.auth import require_api_key
 from src.services.executor import (
     get_approved_plans,
     load_plan,
@@ -61,7 +62,7 @@ def get_plan(reel_id: str):
 
 
 @router.patch("/{reel_id}/status")
-def update_status(reel_id: str, body: StatusUpdate):
+def update_status(reel_id: str, body: StatusUpdate, _: str = Depends(require_api_key)):
     """Update a plan's status."""
     updated = update_plan_status(reel_id, body.status)
     if not updated:
@@ -76,7 +77,7 @@ def summary():
 
 
 @router.post("/{reel_id}/execute")
-def execute_plan_endpoint(reel_id: str):
+def execute_plan_endpoint(reel_id: str, _: str = Depends(require_api_key)):
     """Manually trigger execution of an approved plan."""
     entry = find_plan_by_id(reel_id)
     if not entry:
@@ -156,7 +157,7 @@ class TaskCompletion(BaseModel):
 
 
 @router.patch("/{reel_id}/tasks/{task_index}")
-def update_task(reel_id: str, task_index: int, body: TaskCompletion):
+def update_task(reel_id: str, task_index: int, body: TaskCompletion, _: str = Depends(require_api_key)):
     """Mark a specific task as completed/failed. For external agent use.
 
     Updates the execution_log.json in the plan directory.
