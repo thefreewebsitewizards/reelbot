@@ -1,6 +1,9 @@
 import subprocess
 from pathlib import Path
+
 from loguru import logger
+
+from src.constants import AUDIO_EXTRACTION_TIMEOUT
 
 
 def extract_audio(video_path: Path, output_dir: Path) -> Path:
@@ -20,7 +23,7 @@ def extract_audio(video_path: Path, output_dir: Path) -> Path:
         str(audio_path),
     ]
 
-    result = subprocess.run(cmd, capture_output=True, text=True, timeout=60)
+    result = subprocess.run(cmd, capture_output=True, text=True, timeout=AUDIO_EXTRACTION_TIMEOUT)
     if result.returncode != 0:
         raise RuntimeError(f"ffmpeg failed: {result.stderr}")
 

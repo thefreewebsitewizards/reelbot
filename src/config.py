@@ -45,6 +45,7 @@ class Settings(BaseSettings):
     host: str = "127.0.0.1"
     port: int = 8000
     public_url: str = ""  # e.g. https://reelbot.leadneedleai.com
+    cors_origins: str = "https://reelbot.leadneedleai.com"
 
     model_config = {"env_file": ".env", "env_file_encoding": "utf-8", "extra": "ignore"}
 

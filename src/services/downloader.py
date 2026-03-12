@@ -3,10 +3,12 @@ import subprocess
 import json
 import time
 from pathlib import Path
+
 import httpx
 from loguru import logger
 
 from src.config import settings
+from src.constants import DOWNLOAD_TIMEOUT
 from src.models import ReelMetadata
 
 
@@ -66,7 +68,7 @@ def _download_ytdlp(url: str, shortcode: str, output_dir: Path) -> tuple[Path | 
         url,
     ]
 
-    result = subprocess.run(cmd, capture_output=True, text=True, timeout=120)
+    result = subprocess.run(cmd, capture_output=True, text=True, timeout=DOWNLOAD_TIMEOUT)
     if result.returncode != 0:
         raise RuntimeError(result.stderr[:500])
 
@@ -121,7 +123,7 @@ def _download_apify(url: str, shortcode: str, output_dir: Path) -> tuple[Path, R
         "resultsLimit": 1,
     }
 
-    with httpx.Client(timeout=120) as client:
+    with httpx.Client(timeout=DOWNLOAD_TIMEOUT) as client:
         # Start run
         resp = client.post(run_url, json=payload, headers=headers)
         resp.raise_for_status()

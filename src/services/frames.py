@@ -1,10 +1,18 @@
 import subprocess
 import base64
 from pathlib import Path
+
 from loguru import logger
 
+from src.constants import (
+    FFPROBE_TIMEOUT,
+    FRAME_EXTRACTION_TIMEOUT,
+    FRAME_MAX_DIMENSION,
+    MAX_KEYFRAMES,
+)
 
-def extract_keyframes(video_path: Path, output_dir: Path, max_frames: int = 8) -> list[Path]:
+
+def extract_keyframes(video_path: Path, output_dir: Path, max_frames: int = MAX_KEYFRAMES) -> list[Path]:
     """Extract keyframes from video at regular intervals using ffmpeg.
 
     Captures frames spread evenly across the video so we catch on-screen text,
@@ -20,7 +28,7 @@ def extract_keyframes(video_path: Path, output_dir: Path, max_frames: int = 8) -
         "-of", "default=noprint_wrappers=1:nokey=1",
         str(video_path),
     ]
-    probe = subprocess.run(probe_cmd, capture_output=True, text=True, timeout=10)
+    probe = subprocess.run(probe_cmd, capture_output=True, text=True, timeout=FFPROBE_TIMEOUT)
     duration = float(probe.stdout.strip()) if probe.returncode == 0 else 60.0
 
     # Calculate interval to spread frames evenly
@@ -30,14 +38,14 @@ def extract_keyframes(video_path: Path, output_dir: Path, max_frames: int = 8) -
     cmd = [
         "ffmpeg",
         "-i", str(video_path),
-        "-vf", f"fps=1/{interval:.1f},scale=512:-2",
+        "-vf", f"fps=1/{interval:.1f},scale={FRAME_MAX_DIMENSION}:-2",
         "-frames:v", str(max_frames),
         "-q:v", "3",
         "-y",
         str(frames_dir / "frame_%03d.jpg"),
     ]
 
-    result = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
+    result = subprocess.run(cmd, capture_output=True, text=True, timeout=FRAME_EXTRACTION_TIMEOUT)
     if result.returncode != 0:
         logger.warning(f"Frame extraction failed: {result.stderr[:200]}")
         return []

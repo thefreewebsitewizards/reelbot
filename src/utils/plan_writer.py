@@ -1,11 +1,18 @@
+"""Plan artifact writer -- main entry point for writing plan files to disk.
+
+Delegates HTML rendering to html_renderer and notes formatting to plan_formatter.
+"""
 import json
 from datetime import datetime
 from pathlib import Path
+
 from loguru import logger
 
 from src.config import settings
 from src.models import PipelineResult, PlanIndexEntry, PlanStatus, ImplementationPlan
 from src.utils.plan_router import route_plan
+from src.utils.html_renderer import render_plan_html, html_esc as _html_esc, md_to_html as _md_to_html
+from src.utils.plan_formatter import format_notes_md
 
 
 def write_plan(result: PipelineResult) -> Path:
@@ -47,11 +54,11 @@ def write_plan(result: PipelineResult) -> Path:
     )
 
     # Write analysis-only quick-reference notes
-    notes_md = _format_notes_md(result)
+    notes_md = format_notes_md(result)
     (plan_dir / "notes.md").write_text(notes_md)
 
     # Write pre-rendered HTML view
-    view_html = _render_plan_html(result)
+    view_html = render_plan_html(result)
     (plan_dir / "view.html").write_text(view_html)
 
     # Route blurb to sister project folder
@@ -84,7 +91,7 @@ def write_plan_md(plan: ImplementationPlan, plan_md_path: Path) -> None:
     if plan.level_summaries:
         lines.append("## Implementation Levels")
         lines.append("")
-        level_labels = {"1": "L1 — Note it", "2": "L2 — Build it", "3": "L3 — Go deep"}
+        level_labels = {"1": "L1 -- Note it", "2": "L2 -- Build it", "3": "L3 -- Go deep"}
         for k, v in plan.level_summaries.items():
             label = level_labels.get(k, f"L{k}")
             lines.append(f"- **{label}:** {v}")
@@ -92,7 +99,7 @@ def write_plan_md(plan: ImplementationPlan, plan_md_path: Path) -> None:
 
     # Tasks grouped by level
     lines.extend(["## Tasks", ""])
-    level_labels = {1: "L1 — Note it", 2: "L2 — Build it", 3: "L3 — Go deep"}
+    level_labels = {1: "L1 -- Note it", 2: "L2 -- Build it", 3: "L3 -- Go deep"}
     task_num = 0
     for lvl in (1, 2, 3):
         lvl_tasks = [t for t in plan.tasks if t.level == lvl]
@@ -191,7 +198,7 @@ def _format_plan_md(result: PipelineResult) -> str:
         lines.extend(["", "## Fact Checks", ""])
         for fc in analysis.fact_checks:
             icon = {"verified": "OK", "outdated": "OUTDATED", "better_alternative": "UPDATE", "unverified": "?"}
-            lines.append(f"- **[{icon.get(fc.verdict, '?')}]** \"{fc.claim}\" — {fc.explanation}")
+            lines.append(f"- **[{icon.get(fc.verdict, '?')}]** \"{fc.claim}\" -- {fc.explanation}")
             if fc.better_alternative:
                 lines.append(f"  - Better: {fc.better_alternative}")
 
@@ -212,7 +219,7 @@ def _format_plan_md(result: PipelineResult) -> str:
     # Implementation levels
     lines.extend(["", "## Implementation Levels", ""])
 
-    level_labels = {1: "L1 — Note it", 2: "L2 — Build it", 3: "L3 — Go deep"}
+    level_labels = {1: "L1 -- Note it", 2: "L2 -- Build it", 3: "L3 -- Go deep"}
     for lvl_summary_key, summary_text in plan.level_summaries.items():
         lvl = int(lvl_summary_key)
         label = level_labels.get(lvl, f"L{lvl}")
@@ -255,357 +262,6 @@ def _format_plan_md(result: PipelineResult) -> str:
             lines.append("")
 
     return "\n".join(lines)
-
-
-def _format_notes_md(result: PipelineResult) -> str:
-    """Quick-reference analysis notes (no tasks)."""
-    analysis = result.analysis
-    lines = [
-        f"# Analysis Notes: {result.metadata.creator}",
-        "",
-        f"**Source:** {result.metadata.url}",
-        f"**Category:** {analysis.category}",
-        f"**Relevance:** {analysis.relevance_score:.0%}",
-    ]
-
-    if analysis.theme:
-        lines.extend(["", f"> *{analysis.theme}*"])
-
-    if analysis.business_impact:
-        lines.extend(["", f"**Bottom line:** {analysis.business_impact}"])
-
-    lines.extend(["", "## Summary", "", analysis.summary])
-
-    # Video breakdown
-    vb = analysis.video_breakdown
-    if vb.main_points or vb.key_quotes:
-        lines.extend(["", "## What This Video Covers", ""])
-        if vb.creator_context:
-            lines.append(f"*{vb.creator_context}*")
-            lines.append("")
-        if vb.hook:
-            lines.append(f"**Hook:** {vb.hook}")
-            lines.append("")
-        if vb.main_points:
-            for i, point in enumerate(vb.main_points, 1):
-                lines.append(f"{i}. {point}")
-            lines.append("")
-        if vb.key_quotes:
-            lines.append("**Key quotes:**")
-            for q in vb.key_quotes:
-                lines.append(f'> "{q}"')
-                lines.append("")
-
-    notes = analysis.detailed_notes
-    if notes.what_it_is:
-        lines.extend(["", "## Notes", ""])
-        if notes.what_it_is:
-            lines.append(f"- **What:** {notes.what_it_is}")
-        if notes.how_useful:
-            lines.append(f"- **Useful:** {notes.how_useful}")
-        if notes.how_not_useful:
-            lines.append(f"- **Not useful:** {notes.how_not_useful}")
-        if notes.target_audience:
-            lines.append(f"- **For:** {notes.target_audience}")
-
-    if analysis.business_applications:
-        lines.extend(["", "## Applications", ""])
-        for ba in analysis.business_applications:
-            lines.append(f"- [{ba.urgency}] {ba.area} -> {ba.target_system}: {ba.recommendation}")
-
-    lines.extend(["", "## Key Insights", ""])
-    for insight in analysis.key_insights:
-        lines.append(f"- {insight}")
-
-    if analysis.swipe_phrases:
-        lines.extend(["", "## Swipe Phrases", ""])
-        for phrase in analysis.swipe_phrases:
-            lines.append(f"- {phrase}")
-
-    if analysis.fact_checks:
-        lines.extend(["", "## Fact Checks", ""])
-        for fc in analysis.fact_checks:
-            lines.append(f"- [{fc.verdict}] {fc.claim}: {fc.explanation}")
-
-    return "\n".join(lines)
-
-
-def _render_plan_html(result: PipelineResult) -> str:
-    """Render the full plan as a standalone HTML page."""
-    from pathlib import Path
-    template_path = Path(__file__).resolve().parent.parent.parent / "static" / "plan_view.html"
-    if not template_path.exists():
-        return "<html><body><p>Template not found</p></body></html>"
-
-    template = template_path.read_text()
-
-    analysis = result.analysis
-    plan = result.plan
-
-    # Build similarity HTML
-    similarity_html = ""
-    if result.similarity and result.similarity.similar_plans:
-        top = result.similarity.similar_plans[0]
-        rec_text = {
-            "merge": "Consider merging tasks rather than separate execution.",
-            "skip": "Very similar — review carefully before proceeding.",
-            "generate": "Different enough to proceed.",
-        }.get(result.similarity.recommendation, "")
-        similarity_html = (
-            f'<div class="similarity-callout">'
-            f'<strong>Similar to:</strong> {_html_esc(top.title)} ({top.score}% overlap)'
-        )
-        if top.overlap_areas:
-            similarity_html += f'<br>Overlap: {_html_esc(", ".join(top.overlap_areas))}'
-        if rec_text:
-            similarity_html += f'<br><em>{rec_text}</em>'
-        similarity_html += '</div>'
-
-    # Build applications HTML
-    applications_html = ""
-    if analysis.business_applications:
-        for ba in analysis.business_applications:
-            color = {"high": "#ef4444", "medium": "#f59e0b", "low": "#22c55e"}.get(ba.urgency, "#94a3b8")
-            applications_html += (
-                f'<div class="card" style="border-left: 3px solid {color};">'
-                f'<span class="badge" style="background:{color};">{ba.urgency.upper()}</span> '
-                f'<strong>{_html_esc(ba.area)}</strong> <em>({_html_esc(ba.target_system)})</em>'
-                f'<p>{_md_to_html(ba.recommendation)}</p></div>'
-            )
-
-    # Key insights HTML
-    insights_html = "".join(f"<li>{_md_to_html(i)}</li>" for i in analysis.key_insights)
-
-    # Swipe phrases HTML
-    phrases_html = "".join(f"<li>{_md_to_html(p)}</li>" for p in analysis.swipe_phrases) if analysis.swipe_phrases else "<li>None extracted</li>"
-
-    # Fact checks HTML
-    fact_checks_html = ""
-    if analysis.fact_checks:
-        for fc in analysis.fact_checks:
-            icon = {"verified": "OK", "outdated": "OUTDATED", "better_alternative": "UPDATE", "unverified": "?"}.get(fc.verdict, "?")
-            fc_line = f'<div class="card"><strong>[{icon}]</strong> "{_html_esc(fc.claim)}" &mdash; {_html_esc(fc.explanation)}'
-            if fc.better_alternative:
-                fc_line += f"<br><em>Better: {_html_esc(fc.better_alternative)}</em>"
-            fc_line += "</div>"
-            fact_checks_html += fc_line
-
-    # Recommended action HTML
-    recommended_action_html = ""
-    if plan.recommended_action:
-        recommended_action_html = (
-            f'<div class="impact" style="border-left-color:#22c55e;">'
-            f'<strong>Do this:</strong> {_html_esc(plan.recommended_action)}'
-            f'</div>'
-        )
-
-    # Content angle HTML
-    content_angle_html = ""
-    if plan.content_angle:
-        content_angle_html = f'<h2>DDB Content Angle</h2><p>{_md_to_html(plan.content_angle)}</p>'
-
-    # Level summaries HTML
-    level_summaries_html = ""
-    if plan.level_summaries:
-        level_labels = {"1": "L1 — Note it", "2": "L2 — Build it", "3": "L3 — Go deep"}
-        items = "".join(
-            f'<li><strong>{level_labels.get(k, f"L{k}")}:</strong> {_html_esc(v)}</li>'
-            for k, v in plan.level_summaries.items()
-        )
-        level_summaries_html = f'<h2>Implementation Levels</h2><ul>{items}</ul>'
-
-    # Tasks as JSON for interactive control panel
-    tasks_json_data = []
-    for task in plan.tasks:
-        tasks_json_data.append({
-            "title": task.title,
-            "description": task.description,
-            "priority": task.priority,
-            "estimated_hours": task.estimated_hours,
-            "tools": task.tools,
-            "deliverables": task.deliverables,
-            "level": task.level,
-            "requires_human": task.requires_human,
-            "human_reason": task.human_reason or "",
-        })
-    tasks_json = json.dumps(tasks_json_data)
-
-    # Video breakdown HTML
-    vb = analysis.video_breakdown
-    video_breakdown_html = ""
-    if vb.main_points or vb.key_quotes:
-        video_breakdown_html = '<h2>What This Video Covers</h2>'
-        if vb.creator_context:
-            video_breakdown_html += f'<div class="creator-ctx">{_html_esc(vb.creator_context)}</div>'
-        if vb.hook:
-            video_breakdown_html += f'<div class="hook"><strong>Hook:</strong> {_html_esc(vb.hook)}</div>'
-        if vb.main_points:
-            points = "".join(f"<li>{_html_esc(p)}</li>" for p in vb.main_points)
-            video_breakdown_html += f'<ul class="point-list">{points}</ul>'
-        if vb.key_quotes:
-            for q in vb.key_quotes:
-                video_breakdown_html += f'<div class="quote">&ldquo;{_html_esc(q)}&rdquo;</div>'
-
-    # Detailed notes HTML
-    notes = analysis.detailed_notes
-    notes_html = ""
-    if notes.what_it_is or notes.how_useful:
-        if notes.what_it_is:
-            notes_html += f"<p><strong>What it is:</strong> {_md_to_html(notes.what_it_is)}</p>"
-        if notes.how_useful:
-            notes_html += f"<p><strong>How it helps us:</strong> {_md_to_html(notes.how_useful)}</p>"
-        if notes.how_not_useful:
-            notes_html += f"<p><strong>Limitations:</strong> {_md_to_html(notes.how_not_useful)}</p>"
-        if notes.target_audience:
-            notes_html += f"<p><strong>Who should see this:</strong> {_html_esc(notes.target_audience)}</p>"
-
-    # Duration display
-    dur = result.metadata.duration
-    duration_str = f"{int(dur)}s" if dur < 60 else f"{int(dur // 60)}m {int(dur % 60)}s"
-
-    # Relevance badge color
-    score = analysis.relevance_score
-    relevance_color = "#22c55e" if score >= 0.85 else "#f59e0b" if score >= 0.70 else "#ef4444"
-
-    # Cost breakdown HTML
-    cost_html = ""
-    if result.cost_breakdown and result.cost_breakdown.calls:
-        cb = result.cost_breakdown
-        cost_rows = "".join(
-            f'<tr><td>{_html_esc(c.step)}</td><td>{c.prompt_tokens:,}</td>'
-            f'<td>{c.completion_tokens:,}</td><td>${c.cost_usd:.4f}</td></tr>'
-            for c in cb.calls
-        )
-        cost_html = (
-            f'<h2><a href="/costs" style="color:#f8fafc;text-decoration:none;">Cost Breakdown →</a></h2>'
-            f'<div class="card"><div class="cost-table-wrap"><table>'
-            f'<tr style="color:#94a3b8;text-align:left;"><th>Step</th><th>Prompt</th>'
-            f'<th>Completion</th><th>Cost</th></tr>'
-            f'{cost_rows}'
-            f'<tr style="border-top:1px solid #334155;font-weight:600;">'
-            f'<td>Total</td><td colspan="2"></td><td>${cb.total_cost_usd:.4f}</td></tr>'
-            f'</table></div></div>'
-        )
-
-    replacements = {
-        "{{recommended_action_html}}": recommended_action_html,
-        "{{similarity_html}}": similarity_html,
-        "{{title}}": _html_esc(plan.title),
-        "{{theme}}": _html_esc(analysis.theme) if analysis.theme else "",
-        "{{relevance_score}}": f"{score:.0%}",
-        "{{relevance_color}}": relevance_color,
-        "{{business_impact}}": _html_esc(analysis.business_impact) if analysis.business_impact else "",
-        "{{summary}}": _md_to_html(plan.summary),
-        "{{video_breakdown_html}}": video_breakdown_html,
-        "{{notes_html}}": notes_html,
-        "{{applications_html}}": applications_html,
-        "{{insights_html}}": insights_html,
-        "{{phrases_html}}": phrases_html,
-        "{{fact_checks_section}}": _build_fact_checks_section(fact_checks_html),
-        "{{tasks_json}}": tasks_json,
-        "{{duration}}": duration_str,
-        "{{content_angle_html}}": content_angle_html,
-        "{{level_summaries_html}}": level_summaries_html,
-        "{{source_url}}": _html_esc(result.metadata.url),
-        "{{creator}}": _html_esc(result.metadata.creator),
-        "{{category}}": _html_esc(analysis.category),
-        "{{routed_to_html}}": _build_route_badge(analysis.routing_target),
-        "{{cost_html}}": cost_html,
-        "{{reel_id}}": _html_esc(result.reel_id),
-        "{{status}}": result.status.value,
-    }
-
-    html = template
-    for key, value in replacements.items():
-        html = html.replace(key, value)
-
-    return html
-
-
-def _build_route_badge(routing_target: str) -> str:
-    if not routing_target:
-        return ""
-    return f' &middot; <span class="badge badge-route">{_html_esc(routing_target)}</span>'
-
-
-def _build_fact_checks_section(fact_checks_html: str) -> str:
-    """Build fact checks section: hidden when empty, expanded when populated."""
-    if not fact_checks_html:
-        return ""
-    return (
-        '<h2>Fact Checks</h2>\n'
-        f'<div>{fact_checks_html}</div>'
-    )
-
-
-def _html_esc(text: str) -> str:
-    """Escape HTML special characters."""
-    if not text:
-        return ""
-    return (
-        text.replace("&", "&amp;")
-        .replace("<", "&lt;")
-        .replace(">", "&gt;")
-        .replace('"', "&quot;")
-        .replace("'", "&#x27;")
-    )
-
-
-def _md_to_html(text: str) -> str:
-    """Convert basic markdown to HTML for plan view rendering.
-
-    Handles: **bold**, *italic*, `code`, line breaks, and bullet lists.
-    Escapes HTML first for safety, then applies markdown conversion.
-    """
-    import re
-
-    if not text:
-        return ""
-
-    escaped = _html_esc(text)
-
-    # Bold: **text**
-    escaped = re.sub(r'\*\*(.+?)\*\*', r'<strong>\1</strong>', escaped)
-    # Italic: *text* (but not inside <strong> tags)
-    escaped = re.sub(r'(?<!</strong>)\*(.+?)\*', r'<em>\1</em>', escaped)
-    # Inline code: `text`
-    escaped = re.sub(r'`(.+?)`', r'<code>\1</code>', escaped)
-
-    # Split into lines for block-level processing
-    lines = escaped.split('\n')
-    result_lines = []
-    in_list = False
-
-    for line in lines:
-        stripped = line.strip()
-
-        # Bullet list item: - text
-        if stripped.startswith('- '):
-            if not in_list:
-                result_lines.append('<ul>')
-                in_list = True
-            result_lines.append(f'<li>{stripped[2:]}</li>')
-        else:
-            if in_list:
-                result_lines.append('</ul>')
-                in_list = False
-
-            if stripped:
-                result_lines.append(f'{stripped}<br>')
-            else:
-                result_lines.append('<br>')
-
-    if in_list:
-        result_lines.append('</ul>')
-
-    # Clean up trailing <br> before </ul>
-    html = '\n'.join(result_lines)
-    html = html.replace('<br>\n<ul>', '\n<ul>')
-    # Remove double <br> at end
-    if html.endswith('<br>'):
-        html = html[:-4]
-
-    return html
 
 
 def _update_index(result: PipelineResult, plan_dir_name: str, *, routed_to: str = "") -> None:

@@ -1,3 +1,4 @@
+import os
 from contextlib import asynccontextmanager
 from pathlib import Path
 
@@ -23,9 +24,11 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
+allowed_origins = os.getenv("CORS_ORIGINS", "https://reelbot.leadneedleai.com").split(",")
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=allowed_origins,
     allow_methods=["*"],
     allow_headers=["*"],
 )

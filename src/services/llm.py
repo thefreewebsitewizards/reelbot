@@ -3,11 +3,20 @@
 import base64
 import time
 from dataclasses import dataclass, field
-from openai import OpenAI
-from loguru import logger
+
 import httpx
+from loguru import logger
+from openai import (
+    APIConnectionError,
+    APITimeoutError,
+    InternalServerError,
+    OpenAI,
+    RateLimitError,
+)
 
 from src.config import settings
+from src.constants import LLM_API_TIMEOUT, MAX_RETRIES, RETRY_BACKOFF_FACTOR
+from src.utils.retry import retry_on_exception
 
 # Per-million-token pricing: (prompt_price, completion_price)
 MODEL_PRICING: dict[str, tuple[float, float]] = {
@@ -78,6 +87,17 @@ def _get_client(model_override: str = "") -> tuple[OpenAI, str]:
     )
 
 
+@retry_on_exception(
+    retryable_exceptions=(
+        APIConnectionError,
+        APITimeoutError,
+        InternalServerError,
+        RateLimitError,
+        ConnectionError,
+        TimeoutError,
+    ),
+    description="LLM chat completion",
+)
 def chat(
     system: str,
     user_content: str | list,
@@ -149,7 +169,7 @@ def chat(
     )
 
 
-def fetch_generation_cost(generation_id: str, retries: int = 3) -> dict | None:
+def fetch_generation_cost(generation_id: str, retries: int = MAX_RETRIES) -> dict | None:
     """Fetch actual cost from OpenRouter's generation API.
 
     OpenRouter may take a moment to finalize cost data, so we retry with backoff.
@@ -167,7 +187,7 @@ def fetch_generation_cost(generation_id: str, retries: int = 3) -> dict | None:
 
     for attempt in range(retries):
         try:
-            resp = httpx.get(url, headers=headers, timeout=10)
+            resp = httpx.get(url, headers=headers, timeout=LLM_API_TIMEOUT)
             if resp.status_code == 200:
                 data = resp.json().get("data", {})
                 if data.get("total_cost") is not None:
@@ -180,10 +200,12 @@ def fetch_generation_cost(generation_id: str, retries: int = 3) -> dict | None:
                         "model": data.get("model", ""),
                     }
             if attempt < retries - 1:
-                time.sleep(1 * (attempt + 1))
+                delay = RETRY_BACKOFF_FACTOR ** attempt
+                time.sleep(delay)
         except httpx.HTTPError as e:
             logger.debug(f"OpenRouter generation lookup failed (attempt {attempt + 1}): {e}")
             if attempt < retries - 1:
-                time.sleep(1 * (attempt + 1))
+                delay = RETRY_BACKOFF_FACTOR ** attempt
+                time.sleep(delay)
 
     return None

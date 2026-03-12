@@ -1,55 +1,44 @@
-# Session Handoff — 2026-03-11 (Session 15)
+# Session Handoff — 2026-03-11 (Session 16)
 
 ## Project Overview
-- Instagram Reel → Business Strategy Pipeline (FastAPI + Telegram + OpenRouter LLM)
+- Instagram Reel -> Business Strategy Pipeline (FastAPI + Telegram + OpenRouter LLM)
 - Ref: `CLAUDE.md` for full architecture, commands, execution rules
 
 ## Completed This Session
 
-### Tiered Plan Writer + Level-Filtered Execution
-- `plan_writer.py`: `_format_plan_md` and `write_plan_md` group tasks by L1/L2/L3, show `content_angle` + `level_summaries`
-- `executor.py`: reads `approved_level` from metadata.json, filters tasks to `level <= approved_level`
-- Removed dead code: `_format_repurposing_md`, repurposing/personal_brand file writes + HTML sections
-- `plan_view.html`: uses `{{content_angle_html}}` / `{{level_summaries_html}}` (replaced old placeholders)
+### Web Control Panel (replaces Telegram buttons)
+- `static/plan_view.html`: interactive task checklist with checkboxes, optional notes textarea, "Approve selected" / "Skip" buttons, feedback row (good/bad/partial + comment)
+- `src/routers/plans.py`: new endpoints — `POST /plans/{id}/approve` (accepts `selected_tasks` list + `notes`), `POST /plans/{id}/skip`, `POST /plans/{id}/feedback`
+- `src/services/executor.py`: reads `selected_tasks` from metadata.json, falls back to legacy `approved_level`
+- `src/utils/plan_writer.py`: tasks passed as JSON (`{{tasks_json}}`) for client-side rendering, removed `_build_action_buttons`
 
-### Knowledge Base Tool
-- `src/utils/knowledge_base.py` — persistent JSON storage at `plans/_knowledge_base.json`
-- Handler `_handle_knowledge_base` in executor.py (in `_TOOL_HANDLERS`)
-- API: `src/routers/knowledge.py` — GET /knowledge/, /knowledge/search, /knowledge/context
-- Plan prompt: L1 tasks prefer `knowledge_base` tool with `tool_data: {title, content, category, tags}`
+### Telegram Simplified to Notification-Only
+- `telegram_bot.py`: sends 3-line message (title + recommended action + link), no inline buttons/files/costs/refinement
+- Removed: `cmd_approve`, `cmd_reject`, `cmd_done`, `_approve_plan`, `_reject_plan`, `_refine_plan`, `_handle_approve_with_notes`, `_handle_feedback`, `_format_cost_line`, all inline button handlers except similarity flow
+- Kept: `/plans`, `/status` commands, similarity generate_anyway/skip flow, progress timer
 
-### OpenClaw Agent Wiring
-- `agent_loop.py` updated with `knowledge_base` handler
-- `scripts/reelbot-agent.service` + `scripts/deploy-agent.sh` — one-command VPS deploy
+### Dead Code Cleanup
+- Deleted: `src/services/repurposer.py`, `src/services/personal_brand.py`, `src/prompts/content_repurposing.py`, `src/prompts/personal_brand.py`
+- Cleaned refs in: `models.py` (removed `repurposing_plan`/`personal_brand_plan`), `config.py`, `api_config.py`, `dashboard.py`
+- Removed 4 dead tests, 61 tests passing
 
-### Progress Timer Fix
-- Blocking pipeline steps now use `asyncio.to_thread()` — progress message no longer stuck
-- `src/utils/processing_stats.py` — rolling average of last 20 runs, shows `~Xs estimated` at start
-- Countdown: `"Analyzing content... (step 3/4, ~25s left)"`
+### Other
+- `recommended_action` added to `plan.md` and `view.html` artifacts
+- KB context injected into planner prompt (`generate_plan.py` calls `get_recent_context()`)
+- Fixed stale Telegram webhook (`app.leadneedleai.com/webhooks/telegram-bot` was intercepting messages — deleted it)
 
-### Recommended Action + Approve with Notes
-- `recommended_action` field added to `ImplementationPlan` model, planner, and plan prompt
-- Telegram summary shows `*Do this:* [action]` below title
-- New `✏️ Approve w/ notes` button → prompts for conditions → saves `approval_notes` in metadata.json + approves
-
-### Shared Context Fix
-- `n8n-automations.md` marked DEPRECATED (migrated to AIAS Express backend)
-- `tfww.md` updated: n8n refs → AIAS backend
-- `reelbot.md` updated with KB, tiered plans, agent deploy info
-
-### Tests
-- 65 tests passing (was 61). New: KB handler (3), level filter (1), tiered format (1), content angle HTML (1), replaced 2 old repurposing/brand tests
+### Deploy
+- Committed as `d47a796`, pushed to main, auto-deploying via GitHub Actions -> Coolify
 
 ## Next Steps
-- [ ] **Deploy + test** — push to main, send a reel, verify: recommended action line, approve with notes flow, accurate time estimate
+- [ ] **Test the deploy** — resend a reel, verify: notification message in Telegram, web control panel loads, approve selected tasks works, execution runs
 - [ ] **Deploy agent to VPS** — `./scripts/deploy-agent.sh` (needs SSH to 217.216.90.203)
-- [ ] **Add `recommended_action` to plan_writer.py output** — not yet in plan.md or view.html artifacts
-- [ ] **Delete dead files** — `src/services/repurposer.py`, `src/services/personal_brand.py`, `src/prompts/content_repurposing.py`, `src/prompts/personal_brand.py`
-- [ ] **Inject KB context into planner** — use `get_recent_context()` so LLM avoids duplicate insights
-- [ ] **Review old plans** — 2 plans in "review" status are pre-tiered format
+- [ ] **Review old plans** — 12 plans in "review" status are pre-control-panel format (static view.html)
+- [ ] **Monitor webhook** — if something re-sets the Telegram webhook, polling will break again. Check with `getWebhookInfo` API
+- [ ] **Shared context update** — update `~/projects/openclaw/.shared-context/reelbot.md` with web control panel, simplified Telegram
 
 ## Context Notes
-- `approval_notes` in metadata.json is saved but not yet read by executor — wire into execution log
+- `approval_notes` saved in metadata.json but not yet read by executor — wire into execution log if needed
+- `_handle_generate_anyway` in telegram_bot.py still loads analysis from disk and generates plan — now sends notification+link instead of full summary
+- The approve endpoint auto-triggers execution in a background thread — no separate step needed
 - `processing_stats.py` starts at 55s default, self-calibrates after first run
-- Shared context files sync to `shared-context/` in repo via pre-commit hook for Docker builds
-- Local `.env` has `ENABLE_TELEGRAM_BOT=false` — safe for dev
