@@ -217,7 +217,7 @@ def _run_pipeline(reel_id: str, reel_url: str, user_context: str = "") -> None:
             cleanup_temp_dir(reel_id)
             return
 
-        plan, plan_cr = generate_plan(analysis, metadata, user_context=user_context)
+        plan, plan_cr = generate_plan(analysis, metadata, user_context=user_context, similarity=similarity)
         costs.add("plan", plan_cr.model, plan_cr.prompt_tokens, plan_cr.completion_tokens, plan_cr.cost_usd, plan_cr.generation_id)
 
         costs.resolve_actual_costs()

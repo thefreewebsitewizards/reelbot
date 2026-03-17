@@ -75,6 +75,20 @@
   table th, table td { padding: 6px 10px; text-align: left; }
   .cost-table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
 
+  /* Nav bar */
+  .nav-bar {
+    position: sticky; top: 0; z-index: 100;
+    background: #0f172a; border-bottom: 1px solid #334155;
+    padding: 8px 16px; margin: -16px -16px 16px -16px;
+    display: flex; align-items: center; gap: 12px;
+    font-size: 0.85rem;
+  }
+  .nav-bar a { color: #60a5fa; white-space: nowrap; }
+  .nav-title { color: #94a3b8; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; }
+  .nav-links { display: flex; gap: 8px; }
+  .nav-links a { color: #64748b; }
+  .nav-links a:hover { color: #e2e8f0; }
+
   /* Control panel */
   .control-panel {
     background: #1e293b; border-radius: 8px; padding: 20px;
@@ -113,6 +127,13 @@
     display: inline-block; padding: 1px 6px; border-radius: 3px;
     font-size: 0.7rem; font-weight: 600; background: #7f1d1d; color: #fca5a5;
   }
+  .change-type-badge {
+    display: inline-block; padding: 1px 6px; border-radius: 3px;
+    font-size: 0.7rem; font-weight: 600; margin-left: 4px;
+  }
+  .ct-addition { background: #14532d; color: #4ade80; }
+  .ct-replacement { background: #7f1d1d; color: #fca5a5; }
+  .ct-reinforcement { background: #1e3a5f; color: #60a5fa; }
   .notes-area {
     width: 100%; background: #0f172a; border: 1px solid #334155; border-radius: 6px;
     color: #e2e8f0; padding: 10px 12px; font-size: 0.9rem; resize: vertical;
@@ -180,11 +201,27 @@
     table th, table td { padding: 4px 6px; font-size: 0.8rem; white-space: nowrap; }
     .collapsible-content { display: block; }
     .collapsible::after { content: " −"; }
+    .nav-links { display: none; }
+    .nav-bar { margin: -10px -10px 10px -10px; }
   }
 </style>
 </head>
 <body>
 
+<!-- Nav bar -->
+<div class="nav-bar" id="nav-bar">
+  <a href="/">&larr; Plans</a>
+  <span class="nav-title">{{title}}</span>
+  <div class="nav-links">
+    <a href="#section-tasks">Tasks</a>
+    <a href="#section-applications">Apps</a>
+    <a href="#section-social">Social</a>
+    <a href="#section-video">Video</a>
+    <a href="#section-insights">Insights</a>
+  </div>
+</div>
+
+<!-- Header -->
 <div class="header">
   <h1>{{title}}</h1>
   <div class="theme">{{theme}}</div>
@@ -194,13 +231,31 @@
   </div>
 </div>
 
+<!-- Recommended Action -->
 {{recommended_action_html}}
+
+<div id="section-comparison">{{comparison_html}}</div>
+
+<!-- Similarity -->
 {{similarity_html}}
+
+<!-- Business Impact -->
 <div class="impact">{{business_impact}}</div>
 
+<!-- Summary -->
 <p>{{summary}}</p>
 
-<!-- Control Panel -->
+<!-- Business Applications -->
+<div id="section-applications">
+<h2>Business Applications</h2>
+{{applications_html}}
+</div>
+
+<!-- Implementation Levels -->
+{{level_summaries_html}}
+
+<!-- Tasks / Control Panel -->
+<div id="section-tasks">
 <div class="control-panel" id="control-panel">
   <h2>Tasks</h2>
   <div class="resolved-banner" id="resolved-banner"></div>
@@ -222,31 +277,30 @@
   <input class="fb-comment" id="fb-comment" placeholder="What should be different?" />
   <button class="fb-btn fb-submit" id="fb-submit" onclick="sendFeedback()">Send feedback</button>
 </div>
+</div>
 
+<div id="section-social">{{social_media_html}}</div>
+
+<!-- Video Breakdown — collapsed by default -->
+<h2 class="collapsible" onclick="toggle(this)" id="section-video">What This Video Covers</h2>
+<div class="collapsible-content">
 {{video_breakdown_html}}
+</div>
 
-<h2>Key Insights</h2>
+<!-- Key Insights -->
+<h2 id="section-insights">Key Insights</h2>
 <ul>{{insights_html}}</ul>
 
-<h2>Swipe Phrases</h2>
-<ul>{{phrases_html}}</ul>
-
+<!-- Our Take — collapsed -->
 <h2 class="collapsible" onclick="toggle(this)">Our Take</h2>
 <div class="collapsible-content">
 <div class="section-notes">{{notes_html}}</div>
 </div>
 
-<h2 class="collapsible" onclick="toggle(this)">Business Applications</h2>
-<div class="collapsible-content">
-{{applications_html}}
-</div>
-
+<!-- Fact Checks (only if non-empty) -->
 {{fact_checks_section}}
 
-{{content_angle_html}}
-
-{{level_summaries_html}}
-
+<!-- Cost -->
 {{cost_html}}
 
 <script>
@@ -261,11 +315,16 @@ function renderTasks() {
   var isResolved = PLAN_STATUS !== 'review';
   var levelLabels = {1: 'L1', 2: 'L2', 3: 'L3'};
   var levelClasses = {1: 'level-1', 2: 'level-2', 3: 'level-3'};
+  var ctClasses = {addition: 'ct-addition', replacement: 'ct-replacement', reinforcement: 'ct-reinforcement'};
 
   list.innerHTML = TASKS.map(function(t, i) {
     var levelBadge = '<span class="task-level-badge ' + (levelClasses[t.level] || 'level-1') + '">' +
       (levelLabels[t.level] || 'L' + t.level) + '</span>';
     var humanBadge = t.requires_human ? ' <span class="human-badge">NEEDS HUMAN</span>' : '';
+    var changeTypeBadge = '';
+    if (t.change_type && ctClasses[t.change_type]) {
+      changeTypeBadge = ' <span class="change-type-badge ' + ctClasses[t.change_type] + '">' + t.change_type.toUpperCase() + '</span>';
+    }
     var deliverables = '';
     if (t.deliverables && t.deliverables.length) {
       deliverables = '<ul class="task-deliverables">' +
@@ -276,7 +335,7 @@ function renderTasks() {
     return '<div class="' + cls + '" data-idx="' + i + '" onclick="toggleTask(' + i + ',this)">' +
       '<div class="task-check"><span class="task-check-mark">&#10003;</span></div>' +
       '<div class="task-body">' +
-        '<div class="task-title">' + levelBadge + esc(t.title) + humanBadge + '</div>' +
+        '<div class="task-title">' + levelBadge + esc(t.title) + humanBadge + changeTypeBadge + '</div>' +
         '<div class="task-meta">' + esc(t.priority) + ' &middot; ' + t.estimated_hours.toFixed(1) + 'h &middot; ' + esc(t.tools.join(', ')) + '</div>' +
         '<div class="task-desc">' + esc(t.description) + '</div>' +
         deliverables +

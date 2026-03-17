@@ -4,10 +4,10 @@ from loguru import logger
 from src.config import settings
 from src.models import (
     AnalysisResult, ReelMetadata, ImplementationPlan, PlanTask,
-    SimilarityResult, SimilarPlan,
+    SimilarityResult, SimilarPlan, ContentComparison,
 )
 from src.prompts.generate_plan import build_plan_prompt
-from src.utils.plan_manager import get_past_plan_summaries
+from src.utils.plan_manager import get_past_plan_summaries, load_plan_content
 from src.utils.capability_manager import get_capabilities_context
 from src.services.llm import chat, ChatResult, get_model_for_step
 from src.utils.json_extract import extract_json, normalize_string_list
@@ -67,6 +67,10 @@ Rules:
             )
             for p in data.get("similar_plans", [])
         ]
+        plans_to_enrich = [p for p in similar if p.score > 30]
+        if plans_to_enrich:
+            _enrich_with_comparisons(analysis, plans_to_enrich)
+
         max_score = max((p.score for p in similar), default=0)
         return SimilarityResult(
             similar_plans=similar,
@@ -78,7 +82,72 @@ Rules:
         return SimilarityResult(), chat_result
 
 
-def generate_plan(analysis: AnalysisResult, metadata: ReelMetadata, user_context: str = "") -> tuple[ImplementationPlan, ChatResult]:
+def _enrich_with_comparisons(
+    analysis: AnalysisResult,
+    plans: list[SimilarPlan],
+) -> None:
+    """Load plan.md content for top matches and ask the LLM for per-area comparisons."""
+    for plan in plans[:3]:
+        try:
+            plan_content = load_plan_content(plan.reel_id)
+            if not plan_content:
+                continue
+
+            system = (
+                "You compare an existing plan against a new analysis to find "
+                "per-area content differences. Respond with valid JSON only."
+            )
+            user_content = f"""Compare the existing plan content against the new analysis.
+
+**Existing plan ({plan.title}):**
+{plan_content}
+
+**New analysis:**
+- Theme: {analysis.theme}
+- Category: {analysis.category}
+- Summary: {analysis.summary}
+- Key insights: {', '.join(analysis.key_insights[:5])}
+
+Return JSON:
+{{
+  "comparisons": [
+    {{
+      "area": "specific topic area",
+      "current_content": "what existing plan says (1 sentence)",
+      "new_content": "what new reel adds (1 sentence)",
+      "verdict": "better|worse|same|different_angle",
+      "explanation": "1 sentence why"
+    }}
+  ]
+}}
+
+Rules:
+- Maximum 3 comparisons
+- Focus on the most meaningful differences
+- verdict must be one of: better, worse, same, different_angle"""
+
+            result = chat(
+                system=system,
+                user_content=user_content,
+                max_tokens=500,
+                model_override=get_model_for_step("similarity"),
+            )
+            data = extract_json(result.text, context="enrichment")
+            plan.comparisons = [
+                ContentComparison(
+                    area=c.get("area", ""),
+                    current_content=c.get("current_content", ""),
+                    new_content=c.get("new_content", ""),
+                    verdict=c.get("verdict", ""),
+                    explanation=c.get("explanation", ""),
+                )
+                for c in data.get("comparisons", [])[:3]
+            ]
+        except Exception as exc:
+            logger.warning(f"Enrichment failed for plan {plan.reel_id}: {exc}")
+
+
+def generate_plan(analysis: AnalysisResult, metadata: ReelMetadata, user_context: str = "", similarity: SimilarityResult | None = None) -> tuple[ImplementationPlan, ChatResult]:
     """Generate an implementation plan from the analysis using an LLM."""
 
     existing_plans = get_past_plan_summaries(limit=10)
@@ -93,10 +162,21 @@ def generate_plan(analysis: AnalysisResult, metadata: ReelMetadata, user_context
             script_section_ids = get_script_summary()
             logger.info("Injecting sales script context into plan prompt")
 
+    comparison_context = ""
+    if similarity:
+        lines = []
+        for sp in similarity.similar_plans:
+            if sp.comparisons:
+                for c in sp.comparisons:
+                    lines.append(f"- {c.area}: current=\"{c.current_content}\", new=\"{c.new_content}\" (verdict: {c.verdict})")
+        if lines:
+            comparison_context = "\n".join(lines)
+
     system_prompt, user_prompt = build_plan_prompt(
         analysis, metadata, existing_plans, script_context, script_section_ids,
         capabilities_context=capabilities,
         user_context=user_context,
+        comparison_context=comparison_context,
     )
 
     logger.info("Generating implementation plan...")
@@ -118,6 +198,7 @@ def generate_plan(analysis: AnalysisResult, metadata: ReelMetadata, user_context
                 requires_human=bool(t.get("requires_human", False)),
                 human_reason=t.get("human_reason") or "",
                 level=int(t.get("level", 1)),
+                change_type=t.get("change_type") or "",
             ))
 
         plan = ImplementationPlan(

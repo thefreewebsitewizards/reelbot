@@ -61,6 +61,21 @@ class FactCheck(BaseModel):
     better_alternative: str = ""
 
 
+class ContentComparison(BaseModel):
+    area: str = ""
+    current_content: str = ""
+    new_content: str = ""
+    verdict: str = ""  # better | worse | same | different_angle
+    explanation: str = ""
+
+
+class ContentResponse(BaseModel):
+    react_angle: str = ""
+    corrections: list[str] = []
+    repurpose_ideas: list[str] = []
+    engagement_hook: str = ""
+
+
 class AnalysisResult(BaseModel):
     category: str
     summary: str
@@ -77,6 +92,7 @@ class AnalysisResult(BaseModel):
     fact_checks: list[FactCheck] = []
     routing_target: str = "tfww"
     web_design_insights: list[str] = []
+    content_response: ContentResponse = Field(default_factory=ContentResponse)
 
 
 class SimilarPlan(BaseModel):
@@ -84,6 +100,7 @@ class SimilarPlan(BaseModel):
     reel_id: str = ""
     score: int = 0  # 0-100
     overlap_areas: list[str] = []
+    comparisons: list[ContentComparison] = []
 
 
 class SimilarityResult(BaseModel):
@@ -104,6 +121,7 @@ class PlanTask(BaseModel):
     human_reason: str = ""
     tool_data: dict = {}  # Structured data for automated execution (e.g. section_id, content)
     level: int = 1  # 1=note, 2=implement, 3=ambitious
+    change_type: str = ""  # addition | replacement | reinforcement | ignore
 
 
 class ImplementationPlan(BaseModel):

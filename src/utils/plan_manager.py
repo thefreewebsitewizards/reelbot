@@ -151,6 +151,19 @@ def is_duplicate(reel_id: str) -> bool:
     return find_plan_by_id(reel_id) is not None
 
 
+def load_plan_content(reel_id: str) -> str:
+    """Load the plan.md content for a given reel_id. Returns empty string if not found."""
+    index = get_index()
+    for entry in reversed(index["plans"]):
+        if entry["reel_id"] == reel_id:
+            plan_md = settings.plans_dir / entry["plan_dir"] / "plan.md"
+            if plan_md.exists():
+                content = plan_md.read_text()
+                # Truncate to ~2000 chars to keep token cost reasonable
+                return content[:2000]
+    return ""
+
+
 def get_past_plan_summaries(limit: int = 10) -> str:
     """Get summaries of recent plans for knowledge base cross-referencing.
     Returns a text block the planner can use to avoid duplicate recommendations."""

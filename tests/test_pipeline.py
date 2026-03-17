@@ -428,7 +428,7 @@ def test_plan_writer_shows_fact_checks_expanded(tmp_path):
 
 
 def test_plan_writer_content_angle_in_html(tmp_path):
-    """write_plan includes content_angle and level_summaries in HTML view."""
+    """write_plan includes level_summaries in HTML view and content_angle in plan.md."""
     with patch("src.utils.plan_writer.settings") as mock_settings:
         mock_settings.plans_dir = tmp_path
 
@@ -455,9 +455,12 @@ def test_plan_writer_content_angle_in_html(tmp_path):
         plan_dir = write_plan(result)
 
         html = (plan_dir / "view.html").read_text()
-        assert "DDB Content Angle" in html
-        assert "How we use AI to analyze reels" in html
         assert "Implementation Levels" in html
+
+        # content_angle is still rendered in plan.md
+        plan_md = (plan_dir / "plan.md").read_text()
+        assert "DDB Content Angle" in plan_md
+        assert "How we use AI to analyze reels" in plan_md
 
 
 def test_plan_writer_similarity_in_html(tmp_path):

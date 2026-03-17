@@ -77,10 +77,18 @@ async def send_similarity_notification(
     """Send a Telegram message about detected similarity with action buttons."""
     similar_lines = []
     for sp in similarity.similar_plans:
-        overlap = ", ".join(sp.overlap_areas) if sp.overlap_areas else "general"
         similar_lines.append(
-            f"  - {_esc(sp.title)} ({sp.score}% match, overlap: {_esc(overlap)})"
+            f"  _{_esc(sp.title)}_ ({sp.score}% match)"
         )
+        if sp.comparisons:
+            for c in sp.comparisons:
+                emoji = {"better": "+", "worse": "-", "same": "=", "different_angle": "~"}.get(c.verdict, "?")
+                similar_lines.append(
+                    f"    \\[{emoji}\\] {_esc(c.area)}: {_esc(c.explanation)}"
+                )
+        elif sp.overlap_areas:
+            overlap = ", ".join(sp.overlap_areas)
+            similar_lines.append(f"    Overlap: {_esc(overlap)}")
     similar_text = "\n".join(similar_lines)
     theme_text = f"*Theme:* {_esc(analysis.theme)}\n" if analysis.theme else ""
 
@@ -123,7 +131,7 @@ async def handle_generate_anyway(reel_id: str, query) -> None:
 
         analysis, metadata, transcript, costs, similarity = _load_saved_analysis(reel_id, plan_dir)
 
-        plan, plan_cr = generate_plan(analysis, metadata)
+        plan, plan_cr = generate_plan(analysis, metadata, similarity=similarity)
         costs.add(
             "plan", plan_cr.model, plan_cr.prompt_tokens,
             plan_cr.completion_tokens, plan_cr.cost_usd, plan_cr.generation_id,

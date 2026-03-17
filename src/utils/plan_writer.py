@@ -207,11 +207,6 @@ def _format_plan_md(result: PipelineResult) -> str:
     for insight in analysis.key_insights:
         lines.append(f"- {insight}")
 
-    if analysis.swipe_phrases:
-        lines.extend(["", "## Swipe Phrases", ""])
-        for phrase in analysis.swipe_phrases:
-            lines.append(f"- {phrase}")
-
     # Content angle
     if plan.content_angle:
         lines.extend(["", "## DDB Content Angle", "", plan.content_angle])
@@ -248,6 +243,8 @@ def _format_plan_md(result: PipelineResult) -> str:
             human_flag = " [NEEDS HUMAN]" if task.requires_human else ""
             lines.append(f"#### {task_num}. {task.title}{human_flag}")
             lines.append(f"**Priority:** {task.priority} | **Hours:** {task.estimated_hours:.1f}h | **Tools:** {', '.join(task.tools)}")
+            if task.change_type:
+                lines.append(f"**Change type:** {task.change_type}")
             if task.requires_human and task.human_reason:
                 lines.append(f"**Why human needed:** {task.human_reason}")
             lines.append("")
@@ -260,6 +257,23 @@ def _format_plan_md(result: PipelineResult) -> str:
             if task.dependencies:
                 lines.append(f"\n**Depends on:** {', '.join(task.dependencies)}")
             lines.append("")
+
+    # Social media play
+    cr = analysis.content_response
+    if cr.react_angle or cr.repurpose_ideas or cr.corrections:
+        lines.extend(["", "## Social Media Play", ""])
+        if cr.react_angle:
+            lines.append(f"**React angle:** {cr.react_angle}")
+        if cr.corrections:
+            lines.append("**Corrections:**")
+            for c in cr.corrections:
+                lines.append(f"- {c}")
+        if cr.repurpose_ideas:
+            lines.append("**Repurpose ideas:**")
+            for r in cr.repurpose_ideas:
+                lines.append(f"- {r}")
+        if cr.engagement_hook:
+            lines.append(f"**Engagement hook:** {cr.engagement_hook}")
 
     return "\n".join(lines)
 

@@ -6,7 +6,7 @@ import json
 import re
 from pathlib import Path
 
-from src.models import PipelineResult
+from src.models import ContentComparison, PipelineResult
 
 
 def render_plan_html(result: PipelineResult) -> str:
@@ -23,6 +23,8 @@ def render_plan_html(result: PipelineResult) -> str:
     replacements = {
         "{{recommended_action_html}}": _build_recommended_action_html(plan),
         "{{similarity_html}}": _build_similarity_html(result),
+        "{{comparison_html}}": _build_comparison_html(result),
+        "{{social_media_html}}": _build_social_media_html(result.analysis),
         "{{title}}": html_esc(plan.title),
         "{{theme}}": html_esc(analysis.theme) if analysis.theme else "",
         "{{relevance_score}}": f"{score:.0%}",
@@ -33,11 +35,9 @@ def render_plan_html(result: PipelineResult) -> str:
         "{{notes_html}}": _build_notes_html(analysis),
         "{{applications_html}}": _build_applications_html(analysis),
         "{{insights_html}}": "".join(f"<li>{md_to_html(i)}</li>" for i in analysis.key_insights),
-        "{{phrases_html}}": "".join(f"<li>{md_to_html(p)}</li>" for p in analysis.swipe_phrases) if analysis.swipe_phrases else "<li>None extracted</li>",
         "{{fact_checks_section}}": _build_fact_checks_section(analysis),
         "{{tasks_json}}": _build_tasks_json(plan),
         "{{duration}}": f"{int(result.metadata.duration)}s" if result.metadata.duration < 60 else f"{int(result.metadata.duration // 60)}m {int(result.metadata.duration % 60)}s",
-        "{{content_angle_html}}": f'<h2>DDB Content Angle</h2><p>{md_to_html(plan.content_angle)}</p>' if plan.content_angle else "",
         "{{level_summaries_html}}": _build_level_summaries_html(plan),
         "{{source_url}}": html_esc(result.metadata.url),
         "{{creator}}": html_esc(result.metadata.creator),
@@ -178,6 +178,7 @@ def _build_tasks_json(plan) -> str:
         "estimated_hours": t.estimated_hours, "tools": t.tools,
         "deliverables": t.deliverables, "level": t.level,
         "requires_human": t.requires_human, "human_reason": t.human_reason or "",
+        "change_type": t.change_type,
     } for t in plan.tasks])
 
 
@@ -185,7 +186,7 @@ def _build_video_breakdown_html(analysis) -> str:
     vb = analysis.video_breakdown
     if not vb.main_points and not vb.key_quotes:
         return ""
-    html = '<h2>What This Video Covers</h2>'
+    html = ''
     if vb.creator_context:
         html += f'<div class="creator-ctx">{html_esc(vb.creator_context)}</div>'
     if vb.hook:
@@ -212,6 +213,77 @@ def _build_notes_html(analysis) -> str:
         html += f"<p><strong>Limitations:</strong> {md_to_html(notes.how_not_useful)}</p>"
     if notes.target_audience:
         html += f"<p><strong>Who should see this:</strong> {html_esc(notes.target_audience)}</p>"
+    return html
+
+
+def _build_comparison_html(result: PipelineResult) -> str:
+    """Build comparison cards from similarity comparisons."""
+    if not result.similarity or not result.similarity.similar_plans:
+        return ""
+    comparisons: list[tuple[str, ContentComparison]] = []
+    for sp in result.similarity.similar_plans:
+        for c in sp.comparisons:
+            comparisons.append((sp.title, c))
+    if not comparisons:
+        return ""
+    verdict_colors = {
+        "better": "#22c55e",
+        "worse": "#ef4444",
+        "same": "#94a3b8",
+        "different_angle": "#60a5fa",
+    }
+    html = '<h2>Comparison to Current State</h2>'
+    for _plan_title, c in comparisons:
+        color = verdict_colors.get(c.verdict, "#94a3b8")
+        badge = c.verdict.replace("_", " ").upper()
+        html += (
+            f'<div class="card" style="border-left: 3px solid {color};">'
+            f'<strong>{html_esc(c.area)}</strong> '
+            f'<span class="badge" style="background:{color};">{badge}</span>'
+            f'<p><strong>Current:</strong> {html_esc(c.current_content)}</p>'
+            f'<p><strong>New:</strong> {html_esc(c.new_content)}</p>'
+            f'<p><em>{html_esc(c.explanation)}</em></p>'
+            f'</div>'
+        )
+    return html
+
+
+def _build_social_media_html(analysis) -> str:
+    """Build social media play section from content_response."""
+    cr = analysis.content_response
+    if not cr.react_angle and not cr.corrections and not cr.repurpose_ideas and not cr.engagement_hook:
+        return ""
+    html = '<h2 id="section-social">Social Media Play</h2>'
+    if cr.react_angle:
+        html += (
+            f'<div class="card">'
+            f'<strong>React Angle</strong>'
+            f'<p>{html_esc(cr.react_angle)}</p>'
+            f'</div>'
+        )
+    if cr.corrections:
+        items = "".join(f"<li>{html_esc(c)}</li>" for c in cr.corrections)
+        html += (
+            f'<div class="card">'
+            f'<strong>Corrections</strong>'
+            f'<ul>{items}</ul>'
+            f'</div>'
+        )
+    if cr.repurpose_ideas:
+        items = "".join(f"<li>{html_esc(i)}</li>" for i in cr.repurpose_ideas)
+        html += (
+            f'<div class="card">'
+            f'<strong>Repurpose Ideas</strong>'
+            f'<ul>{items}</ul>'
+            f'</div>'
+        )
+    if cr.engagement_hook:
+        html += (
+            f'<div class="card">'
+            f'<strong>Engagement Hook</strong>'
+            f'<p>{html_esc(cr.engagement_hook)}</p>'
+            f'</div>'
+        )
     return html
 
 

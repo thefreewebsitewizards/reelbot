@@ -7,6 +7,7 @@ from src.config import settings
 from src.models import (
     ReelMetadata, TranscriptResult, AnalysisResult,
     VideoBreakdown, DetailedNotes, BusinessApplication, FactCheck,
+    ContentResponse,
 )
 from src.prompts.analyze_reel import (
     build_analysis_prompt,
@@ -97,6 +98,14 @@ def analyze_reel(
             for fc in data.get("fact_checks", [])
         ]
 
+        cr_data = data.get("content_response") or {}
+        content_response = ContentResponse(
+            react_angle=cr_data.get("react_angle") or "",
+            corrections=cr_data.get("corrections") or [],
+            repurpose_ideas=cr_data.get("repurpose_ideas") or [],
+            engagement_hook=cr_data.get("engagement_hook") or "",
+        )
+
         # Normalize swipe_phrases — LLM sometimes returns dicts instead of strings
         raw_phrases = data.get("swipe_phrases", [])
         swipe_phrases = []
@@ -121,6 +130,7 @@ def analyze_reel(
             business_applications=business_applications,
             business_impact=data.get("business_impact", ""),
             fact_checks=fact_checks,
+            content_response=content_response,
         )
     except (json.JSONDecodeError, IndexError, KeyError, ValueError, TypeError) as e:
         logger.warning(f"Failed to parse analysis JSON ({e}), using raw text")
@@ -201,6 +211,14 @@ def analyze_carousel(
             for fc in data.get("fact_checks", [])
         ]
 
+        cr_data = data.get("content_response") or {}
+        content_response = ContentResponse(
+            react_angle=cr_data.get("react_angle") or "",
+            corrections=cr_data.get("corrections") or [],
+            repurpose_ideas=cr_data.get("repurpose_ideas") or [],
+            engagement_hook=cr_data.get("engagement_hook") or "",
+        )
+
         raw_phrases = data.get("swipe_phrases", [])
         swipe_phrases = []
         for p in raw_phrases:
@@ -224,6 +242,7 @@ def analyze_carousel(
             business_applications=business_applications,
             business_impact=data.get("business_impact", ""),
             fact_checks=fact_checks,
+            content_response=content_response,
         )
     except (json.JSONDecodeError, IndexError, KeyError, ValueError, TypeError) as e:
         logger.warning(f"Failed to parse carousel analysis JSON ({e}), using raw text")

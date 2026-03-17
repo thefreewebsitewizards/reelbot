@@ -101,7 +101,13 @@ Return JSON:
   "web_design_insights": [
     "Specific web design tip, technique, or principle from this reel (if any)",
     "CSS trick, layout pattern, UX principle, conversion optimization, etc."
-  ]
+  ],
+  "content_response": {{
+    "react_angle": "How to respond/react to build authority — frame as 'We should...' or 'Our take...'",
+    "corrections": ["Things the video got wrong we can correct publicly — only include if genuinely wrong"],
+    "repurpose_ideas": ["How to take this content for our channels — specific format + platform"],
+    "engagement_hook": "Suggested comment or reply to the original post — natural, not salesy"
+  }}
 }}
 
 Rules for relevance_score — CALIBRATION GUIDE (the user pre-filters reels, so most will be relevant):
@@ -129,6 +135,12 @@ Rules for web_design_insights:
 - These insights feed directly into our autonomous web design knowledge base
 - Frame as actionable techniques, not vague advice (e.g. "Use 16px minimum body text for readability" not "make text readable")
 - Maximum 10 insights per reel
+
+Rules for content_response:
+- react_angle: How we'd publicly respond to this content. Frame as authority building, not criticism
+- corrections: Only include if the creator made factually wrong claims. Empty array if nothing wrong
+- repurpose_ideas: Specific format (carousel, reel, newsletter) + which platform. Max 3
+- engagement_hook: A natural-sounding comment we could leave on the original post. Skip if no good angle
 
 Rules for video_breakdown:
 - Write main_points as if you're taking notes on the video for someone who hasn't watched it
@@ -244,7 +256,13 @@ Return JSON with the same schema as a reel analysis. Adapt the fields:
   "relevance_score": 0.0-1.0,
   "web_design_insights": [
     "Specific web design tip or technique from this carousel (if any)"
-  ]
+  ],
+  "content_response": {{
+    "react_angle": "How to respond/react to build authority — frame as 'We should...' or 'Our take...'",
+    "corrections": ["Things the carousel got wrong we can correct publicly — only include if genuinely wrong"],
+    "repurpose_ideas": ["How to take this content for our channels — specific format + platform"],
+    "engagement_hook": "Suggested comment or reply to the original post — natural, not salesy"
+  }}
 }}
 
 Rules for routing_target — pick the SINGLE best folder for this carousel's content:

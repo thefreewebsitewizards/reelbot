@@ -83,7 +83,8 @@ Return JSON:
       "tools": ["sales_script"],
       "requires_human": false,
       "human_reason": "",
-      "tool_data": {{}}
+      "tool_data": {{}},
+      "change_type": "addition|replacement|reinforcement|ignore"
     }}
   ]
 }}
@@ -123,6 +124,17 @@ KB_CONTEXT_SECTION = """
 
 **Recent Knowledge Base entries (avoid duplicating these insights):**
 {kb_context}"""
+
+COMPARISON_SECTION = """
+
+**Comparison to Existing Plans (use this to set change_type on tasks):**
+{comparison_context}
+
+When you see a comparison:
+- verdict "better" → task change_type should be "replacement"
+- verdict "different_angle" → task change_type should be "addition"
+- verdict "same" → task change_type should be "reinforcement" (or skip the task)
+- verdict "worse" → task change_type should be "ignore" (don't create a task for it)"""
 
 FEEDBACK_SECTION = """
 
@@ -170,6 +182,7 @@ def build_plan_prompt(
     script_section_ids: str = "",
     capabilities_context: str = "",
     user_context: str = "",
+    comparison_context: str = "",
 ) -> tuple[str, str]:
     insights_formatted = "\n".join(f"- {i}" for i in analysis.key_insights)
 
@@ -222,6 +235,9 @@ def build_plan_prompt(
     kb_context = get_recent_context(limit=10)
     if kb_context:
         user_prompt += KB_CONTEXT_SECTION.format(kb_context=kb_context)
+
+    if comparison_context:
+        user_prompt += COMPARISON_SECTION.format(comparison_context=comparison_context)
 
     if user_context:
         user_prompt += f"\n\n**User notes (prioritize this direction):**\n{user_context}"
