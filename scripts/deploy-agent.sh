@@ -10,7 +10,7 @@ set -euo pipefail
 
 VPS_HOST="217.216.90.203"
 VPS_USER="root"
-REMOTE_DIR="/root/reelbot-agent"
+REMOTE_DIR="/home/openclaw/reelbot-agent"
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 PROJECT_DIR="$(dirname "$SCRIPT_DIR")"
 
