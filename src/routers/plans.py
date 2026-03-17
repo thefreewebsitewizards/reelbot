@@ -1,4 +1,5 @@
 import json
+import logging
 from pathlib import Path
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -15,6 +16,8 @@ from src.services.executor import (
     get_execution_summary,
 )
 from src.utils.plan_manager import update_plan_status, get_plans_by_status, find_plan_by_id
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/plans")
 
@@ -123,12 +126,68 @@ def approve_plan(reel_id: str, body: ApproveRequest):
     )
     thread.start()
 
+    # Send Telegram notification (non-blocking, replaces n8n webhook)
+    _notify_plan_approved(reel_id, plan_data, body.selected_tasks)
+
     return {
         "reel_id": reel_id,
         "status": "approved",
         "selected_tasks": body.selected_tasks,
         "notes": body.notes,
     }
+
+
+def _notify_plan_approved(reel_id: str, plan_data: dict, selected_tasks: list[int]) -> None:
+    """Send Telegram notification when a plan is approved. Replaces n8n workflow."""
+    try:
+        from src.services.telegram_bot import get_bot_app, get_bot_loop
+
+        chat_id = settings.telegram_chat_id
+        if not chat_id:
+            return
+
+        bot_app = get_bot_app()
+        if not bot_app:
+            logger.warning("Telegram bot not running, skipping approval notification")
+            return
+
+        title = plan_data.get("title", f"Plan: {reel_id}")
+        tasks = plan_data.get("tasks", [])
+        selected = [tasks[i] for i in selected_tasks if i < len(tasks)]
+        auto_tasks = [t for t in selected if t.get("automatable")]
+        manual_tasks = [t for t in selected if not t.get("automatable")]
+
+        lines = [f"*Plan Approved*: {title}"]
+        if auto_tasks:
+            lines.append(f"\n*Auto-executing ({len(auto_tasks)}):*")
+            for t in auto_tasks[:5]:
+                lines.append(f"  - {t.get('title', t.get('description', '?'))}")
+        if manual_tasks:
+            lines.append(f"\n*Manual ({len(manual_tasks)}):*")
+            for t in manual_tasks[:5]:
+                lines.append(f"  - {t.get('title', t.get('description', '?'))}")
+
+        web_url = f"https://reelbot.leadneedleai.com/plans/{reel_id}/view"
+        lines.append(f"\n[View Plan]({web_url})")
+
+        message = "\n".join(lines)
+
+        loop = get_bot_loop()
+        if loop:
+            import asyncio
+            asyncio.run_coroutine_threadsafe(
+                bot_app.bot.send_message(
+                    chat_id=chat_id,
+                    text=message,
+                    parse_mode="Markdown",
+                    disable_web_page_preview=True,
+                ),
+                loop,
+            )
+        else:
+            logger.warning("Telegram bot loop not available, skipping notification")
+    except Exception as e:
+        logger.error(f"Plan approval notification failed: {e}")
 
 
 @router.post("/{reel_id}/skip")
