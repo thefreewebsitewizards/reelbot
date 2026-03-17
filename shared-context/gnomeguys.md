@@ -22,6 +22,12 @@ Masters Tournament 2026 merch resale operation — pre-sell, source, and resell 
 - Timeline: Week 2 (Mar 7-13) focus is website core build, product pages, checkout, first blog posts
 - Pre-orders target ~Mar 25, tournament week Apr 6-12
 
+## Sales Operation
+- **Airport channel**: Working as baggage assist at local private airport (FBO), building rapport with private jet travelers, then pitching Masters merch
+- **Approach**: Be their go-to guy — carry bags, be helpful, earn trust, then casually introduce gnome merch. Not hard-sell, relationship-first
+- **Target audience**: High net worth individuals flying private during Masters week — they have money and want unique souvenirs
+- **Reel insights**: Sales strategies from Instagram reels auto-populate into `gnomeguys/sales/reel-insights.md` for continuous improvement
+
 ## Integration Points
 - **Shopify Storefront API**: product data + checkout
 - **Apify API**: Facebook Marketplace scraping
