@@ -71,9 +71,9 @@ def format_notes_md(result: PipelineResult) -> str:
         for phrase in analysis.swipe_phrases:
             lines.append(f"- {phrase}")
 
-    if analysis.fact_checks:
-        lines.extend(["", "## Fact Checks", ""])
-        for fc in analysis.fact_checks:
-            lines.append(f"- [{fc.verdict}] {fc.claim}: {fc.explanation}")
+    if analysis.reality_checks:
+        lines.extend(["", "## Reality Check", ""])
+        for rc in analysis.reality_checks:
+            lines.append(f"- [{rc.verdict}] {rc.claim}: {rc.explanation}")
 
     return "\n".join(lines)

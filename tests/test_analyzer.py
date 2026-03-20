@@ -49,7 +49,7 @@ def _base_llm_response(**overrides) -> dict:
         ],
         "business_impact": "Could increase CTR",
         "swipe_phrases": ["Use this phrase"],
-        "fact_checks": [],
+        "reality_checks": [],
         "routing_target": "tfww",
         "relevance_score": 0.9,
         "web_design_insights": [],

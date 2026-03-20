@@ -6,7 +6,7 @@ from loguru import logger
 from src.config import settings
 from src.models import (
     ReelMetadata, TranscriptResult, AnalysisResult,
-    VideoBreakdown, DetailedNotes, BusinessApplication, FactCheck,
+    VideoBreakdown, DetailedNotes, BusinessApplication, RealityCheck,
     ContentResponse,
 )
 from src.prompts.analyze_reel import (
@@ -88,14 +88,14 @@ def analyze_reel(
             for ba in (data.get("business_applications") or [])
         ]
 
-        fact_checks = [
-            FactCheck(
-                claim=fc.get("claim") or "",
-                verdict=fc.get("verdict") or "unverified",
-                explanation=fc.get("explanation") or "",
-                better_alternative=fc.get("better_alternative") or "",
+        reality_checks = [
+            RealityCheck(
+                claim=rc.get("claim") or "",
+                verdict=rc.get("verdict") or "plausible",
+                explanation=rc.get("explanation") or "",
+                better_alternative=rc.get("better_alternative") or "",
             )
-            for fc in data.get("fact_checks", [])
+            for rc in data.get("reality_checks", [])
         ]
 
         cr_data = data.get("content_response") or {}
@@ -129,7 +129,7 @@ def analyze_reel(
             detailed_notes=detailed_notes,
             business_applications=business_applications,
             business_impact=data.get("business_impact", ""),
-            fact_checks=fact_checks,
+            reality_checks=reality_checks,
             content_response=content_response,
         )
     except (json.JSONDecodeError, IndexError, KeyError, ValueError, TypeError) as e:
@@ -201,14 +201,14 @@ def analyze_carousel(
             for ba in (data.get("business_applications") or [])
         ]
 
-        fact_checks = [
-            FactCheck(
-                claim=fc.get("claim") or "",
-                verdict=fc.get("verdict") or "unverified",
-                explanation=fc.get("explanation") or "",
-                better_alternative=fc.get("better_alternative") or "",
+        reality_checks = [
+            RealityCheck(
+                claim=rc.get("claim") or "",
+                verdict=rc.get("verdict") or "plausible",
+                explanation=rc.get("explanation") or "",
+                better_alternative=rc.get("better_alternative") or "",
             )
-            for fc in data.get("fact_checks", [])
+            for rc in data.get("reality_checks", [])
         ]
 
         cr_data = data.get("content_response") or {}
@@ -241,7 +241,7 @@ def analyze_carousel(
             detailed_notes=detailed_notes,
             business_applications=business_applications,
             business_impact=data.get("business_impact", ""),
-            fact_checks=fact_checks,
+            reality_checks=reality_checks,
             content_response=content_response,
         )
     except (json.JSONDecodeError, IndexError, KeyError, ValueError, TypeError) as e:

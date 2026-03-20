@@ -64,6 +64,7 @@ def _download_ytdlp(url: str, shortcode: str, output_dir: Path) -> tuple[Path | 
         "yt-dlp",
         "--no-warnings",
         "--write-info-json",
+        "--write-comments",
         "-o", str(output_path),
         url,
     ]
@@ -76,12 +77,22 @@ def _download_ytdlp(url: str, shortcode: str, output_dir: Path) -> tuple[Path | 
     creator = ""
     caption = ""
     duration = 0.0
+    like_count = 0
+    comment_count = 0
+    comments = []
     if info_path.exists():
         with open(info_path) as f:
             info = json.load(f)
         creator = info.get("uploader", "") or info.get("channel", "")
         caption = info.get("description", "") or info.get("title", "")
         duration = info.get("duration", 0.0) or 0.0
+        like_count = info.get("like_count", 0) or 0
+        comment_count = info.get("comment_count", 0) or 0
+        for c in (info.get("comments") or [])[:10]:
+            author = c.get("author", "") or ""
+            text = c.get("text", "") or ""
+            if text.strip():
+                comments.append({"author": author, "text": text[:500]})
 
     # Check for carousel (multiple images downloaded)
     image_files = sorted(output_dir.glob(f"{shortcode}*.jpg")) + sorted(output_dir.glob(f"{shortcode}*.png"))
@@ -90,6 +101,7 @@ def _download_ytdlp(url: str, shortcode: str, output_dir: Path) -> tuple[Path | 
         metadata = ReelMetadata(
             url=url, shortcode=shortcode, creator=creator,
             caption=caption, duration=0.0, content_type="carousel",
+            like_count=like_count, comment_count=comment_count, comments=comments,
         )
         logger.info(f"Downloaded carousel via yt-dlp: {len(image_files)} images by {creator}")
         return image_files, metadata
@@ -106,8 +118,9 @@ def _download_ytdlp(url: str, shortcode: str, output_dir: Path) -> tuple[Path | 
     metadata = ReelMetadata(
         url=url, shortcode=shortcode, creator=creator,
         caption=caption, duration=duration,
+        like_count=like_count, comment_count=comment_count, comments=comments,
     )
-    logger.info(f"Downloaded via yt-dlp: {output_path} ({duration:.1f}s, by {creator})")
+    logger.info(f"Downloaded via yt-dlp: {output_path} ({duration:.1f}s, by {creator}, {len(comments)} comments)")
     return output_path, metadata
 
 

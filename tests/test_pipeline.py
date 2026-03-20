@@ -8,7 +8,7 @@ import pytest
 from src.models import (
     ReelMetadata, TranscriptResult, AnalysisResult,
     ImplementationPlan, PlanTask, PipelineResult, PlanStatus, PlanIndexEntry,
-    DetailedNotes, BusinessApplication, FactCheck,
+    DetailedNotes, BusinessApplication, RealityCheck,
     SimilarPlan, SimilarityResult,
 )
 from src.utils.plan_writer import write_plan
@@ -38,10 +38,10 @@ def _make_analysis(**overrides) -> AnalysisResult:
             ),
         ],
         business_impact="Could increase CTR by reframing offers as gifts",
-        fact_checks=[
-            FactCheck(
+        reality_checks=[
+            RealityCheck(
                 claim="Gift-framing increases conversions by 30%",
-                verdict="unverified",
+                verdict="plausible",
                 explanation="No source cited in the reel",
             ),
         ],
@@ -124,7 +124,7 @@ def test_plan_writer(tmp_path):
         assert "[NEEDS HUMAN]" in plan_md
         assert "Why This Matters" in plan_md
         assert "Business Applications" in plan_md
-        assert "Fact Checks" in plan_md
+        assert "Reality Check" in plan_md
         assert "Short theme for scanning" in plan_md
 
         # Check notes.md
@@ -198,7 +198,7 @@ def test_analysis_result_backward_compat():
     assert result.theme == ""
     assert result.business_impact == ""
     assert result.business_applications == []
-    assert result.fact_checks == []
+    assert result.reality_checks == []
     assert result.detailed_notes.what_it_is == ""
 
 
@@ -365,8 +365,8 @@ def test_pipeline_result_with_similarity():
     assert result.similarity.max_score == 60
 
 
-def test_plan_writer_hides_empty_fact_checks(tmp_path):
-    """view.html should not show Fact Checks heading when empty."""
+def test_plan_writer_hides_empty_reality_checks(tmp_path):
+    """view.html should not show Reality Check heading when empty."""
     with patch("src.utils.plan_writer.settings") as mock_settings:
         mock_settings.plans_dir = tmp_path
 
@@ -380,7 +380,7 @@ def test_plan_writer_hides_empty_fact_checks(tmp_path):
                 duration=30.0,
             ),
             transcript=TranscriptResult(text="Test", language="en", duration=30.0),
-            analysis=_make_analysis(fact_checks=[]),
+            analysis=_make_analysis(reality_checks=[]),
             plan=ImplementationPlan(
                 title="Empty Checks Plan",
                 summary="Test",
@@ -391,12 +391,11 @@ def test_plan_writer_hides_empty_fact_checks(tmp_path):
 
         plan_dir = write_plan(result)
         html = (plan_dir / "view.html").read_text()
-        # The <h2>Fact Checks</h2> heading should not appear
-        assert "<h2>Fact Checks</h2>" not in html
+        assert "<h2>Reality Check</h2>" not in html
 
 
-def test_plan_writer_shows_fact_checks_expanded(tmp_path):
-    """view.html should show Fact Checks expanded (not collapsible) when populated."""
+def test_plan_writer_shows_reality_checks_expanded(tmp_path):
+    """view.html should show Reality Check expanded (not collapsible) when populated."""
     with patch("src.utils.plan_writer.settings") as mock_settings:
         mock_settings.plans_dir = tmp_path
 
@@ -421,9 +420,9 @@ def test_plan_writer_shows_fact_checks_expanded(tmp_path):
 
         plan_dir = write_plan(result)
         html = (plan_dir / "view.html").read_text()
-        assert "<h2>Fact Checks</h2>" in html
+        assert "<h2>Reality Check</h2>" in html
         # Should NOT be collapsible (no onclick toggle)
-        assert 'collapsible" onclick="toggle(this)">Fact Checks' not in html
+        assert 'collapsible" onclick="toggle(this)">Reality Check' not in html
 
 
 def test_plan_writer_content_angle_in_html(tmp_path):

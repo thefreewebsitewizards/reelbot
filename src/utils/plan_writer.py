@@ -193,14 +193,14 @@ def _format_plan_md(result: PipelineResult) -> str:
         for ba in analysis.business_applications:
             lines.append(f"- **[{ba.urgency.upper()}]** {ba.area}: {ba.recommendation} *(target: {ba.target_system})*")
 
-    # Fact checks
-    if analysis.fact_checks:
-        lines.extend(["", "## Fact Checks", ""])
-        for fc in analysis.fact_checks:
-            icon = {"verified": "OK", "outdated": "OUTDATED", "better_alternative": "UPDATE", "unverified": "?"}
-            lines.append(f"- **[{icon.get(fc.verdict, '?')}]** \"{fc.claim}\" -- {fc.explanation}")
-            if fc.better_alternative:
-                lines.append(f"  - Better: {fc.better_alternative}")
+    # Reality checks
+    if analysis.reality_checks:
+        lines.extend(["", "## Reality Check", ""])
+        for rc in analysis.reality_checks:
+            icon = {"solid": "SOLID", "plausible": "PLAUSIBLE", "questionable": "QUESTIONABLE", "misleading": "MISLEADING"}
+            lines.append(f"- **[{icon.get(rc.verdict, '?')}]** \"{rc.claim}\" -- {rc.explanation}")
+            if rc.better_alternative:
+                lines.append(f"  - Instead: {rc.better_alternative}")
 
     # Key insights
     lines.extend(["", "## Key Insights", ""])

@@ -34,6 +34,9 @@ class ReelMetadata(BaseModel):
     caption: str = ""
     duration: float = 0.0
     content_type: str = "reel"  # reel or carousel
+    like_count: int = 0
+    comment_count: int = 0
+    comments: list[dict] = []  # [{"author": "...", "text": "..."}]
 
 
 class TranscriptResult(BaseModel):
@@ -63,9 +66,9 @@ class BusinessApplication(BaseModel):
     urgency: str = "medium"  # high, medium, low
 
 
-class FactCheck(BaseModel):
+class RealityCheck(BaseModel):
     claim: str = ""
-    verdict: str = "unverified"  # verified, outdated, better_alternative, unverified
+    verdict: str = "plausible"  # solid, plausible, questionable, misleading
     explanation: str = ""
     better_alternative: str = ""
 
@@ -98,7 +101,7 @@ class AnalysisResult(BaseModel):
     detailed_notes: DetailedNotes = Field(default_factory=DetailedNotes)
     business_applications: list[BusinessApplication] = []
     business_impact: str = ""
-    fact_checks: list[FactCheck] = []
+    reality_checks: list[RealityCheck] = []
     routing_target: str = "tfww"
     web_design_insights: list[str] = []
     content_response: ContentResponse = Field(default_factory=ContentResponse)

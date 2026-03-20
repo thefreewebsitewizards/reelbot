@@ -35,7 +35,7 @@ def render_plan_html(result: PipelineResult) -> str:
         "{{notes_html}}": _build_notes_html(analysis),
         "{{applications_html}}": _build_applications_html(analysis),
         "{{insights_html}}": "".join(f"<li>{md_to_html(i)}</li>" for i in analysis.key_insights),
-        "{{fact_checks_section}}": _build_fact_checks_section(analysis),
+        "{{fact_checks_section}}": _build_reality_checks_section(analysis),
         "{{tasks_json}}": _build_tasks_json(plan),
         "{{duration}}": f"{int(result.metadata.duration)}s" if result.metadata.duration < 60 else f"{int(result.metadata.duration // 60)}m {int(result.metadata.duration % 60)}s",
         "{{level_summaries_html}}": _build_level_summaries_html(plan),
@@ -137,18 +137,26 @@ def _build_applications_html(analysis) -> str:
     return html
 
 
-def _build_fact_checks_section(analysis) -> str:
-    if not analysis.fact_checks:
+def _build_reality_checks_section(analysis) -> str:
+    if not analysis.reality_checks:
         return ""
     html = ""
-    for fc in analysis.fact_checks:
-        icon = {"verified": "OK", "outdated": "OUTDATED", "better_alternative": "UPDATE", "unverified": "?"}.get(fc.verdict, "?")
-        fc_line = f'<div class="card"><strong>[{icon}]</strong> "{html_esc(fc.claim)}" &mdash; {html_esc(fc.explanation)}'
-        if fc.better_alternative:
-            fc_line += f"<br><em>Better: {html_esc(fc.better_alternative)}</em>"
-        fc_line += "</div>"
-        html += fc_line
-    return f'<h2>Fact Checks</h2>\n<div>{html}</div>'
+    verdict_icons = {
+        "solid": "\u2705", "plausible": "\U0001F914",
+        "questionable": "\u26A0\uFE0F", "misleading": "\u274C",
+    }
+    for rc in analysis.reality_checks:
+        icon = verdict_icons.get(rc.verdict, "\U0001F914")
+        verdict_label = rc.verdict.upper()
+        rc_line = (
+            f'<div class="card"><strong>{icon} [{verdict_label}]</strong> '
+            f'"{html_esc(rc.claim)}" &mdash; {html_esc(rc.explanation)}'
+        )
+        if rc.better_alternative:
+            rc_line += f"<br><em>Instead: {html_esc(rc.better_alternative)}</em>"
+        rc_line += "</div>"
+        html += rc_line
+    return f'<h2>Reality Check</h2>\n<div>{html}</div>'
 
 
 def _build_recommended_action_html(plan) -> str:

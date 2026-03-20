@@ -58,8 +58,8 @@ USER_TEMPLATE = """Convert this reel analysis into a tiered implementation plan.
 **Business Applications:**
 {applications_formatted}
 
-**Fact Checks:**
-{fact_checks_formatted}
+**Reality Checks:**
+{reality_checks_formatted}
 
 Return JSON:
 {{
@@ -192,12 +192,12 @@ def build_plan_prompt(
             for ba in analysis.business_applications
         )
 
-    fact_checks_formatted = "- No claims flagged"
-    if analysis.fact_checks:
-        fact_checks_formatted = "\n".join(
-            f"- [{fc.verdict}] \"{fc.claim}\" — {fc.explanation}"
-            + (f" Better: {fc.better_alternative}" if fc.better_alternative else "")
-            for fc in analysis.fact_checks
+    reality_checks_formatted = "- No claims flagged"
+    if analysis.reality_checks:
+        reality_checks_formatted = "\n".join(
+            f"- [{rc.verdict}] \"{rc.claim}\" — {rc.explanation}"
+            + (f" Better: {rc.better_alternative}" if rc.better_alternative else "")
+            for rc in analysis.reality_checks
         )
 
     user_prompt = USER_TEMPLATE.format(
@@ -210,7 +210,7 @@ def build_plan_prompt(
         relevance_score=analysis.relevance_score,
         insights_formatted=insights_formatted,
         applications_formatted=applications_formatted,
-        fact_checks_formatted=fact_checks_formatted,
+        reality_checks_formatted=reality_checks_formatted,
     )
 
     if capabilities_context:

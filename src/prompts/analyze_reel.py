@@ -20,7 +20,8 @@ CRITICAL RULES:
 - If the video is about a TECH TOOL or UPDATE: focus on setup steps and practical usage. Do NOT generate sales copy or website rewrites from tech videos.
 - If the video is about MARKETING/SALES: then swipe phrases and copy are appropriate.
 - Match your output to the video type. A tech demo → tech implementation. A sales technique → sales insights.
-- Be SKEPTICAL of creator claims. Fact-check bold statements. Note if the creator is selling a course or has a financial incentive.
+- Be SKEPTICAL of creator claims. Reality-check bold statements. Note if the creator is selling a course or has a financial incentive.
+- When audience comments are provided, use them as signal — do commenters confirm the advice works? Push back? Share caveats? This is real-world validation.
 - Keep analysis concise. No padding, no redundancy.
 - Reference EXISTING capabilities from the project data above. Don't suggest rebuilding what already works.
 - MATCH DEPTH TO COMPLEXITY. A simple "use this tool/skill" video needs a short analysis. A complex strategy video deserves more depth. Don't over-analyze simple content.
@@ -44,7 +45,8 @@ USER_TEMPLATE = """Analyze this Instagram Reel transcript for actionable busines
 **Creator:** {creator}
 **Caption:** {caption}
 **Duration:** {duration:.0f}s
-
+**Engagement:** {like_count} likes, {comment_count} comments
+{comments_section}
 **Transcript:**
 {text}
 
@@ -88,12 +90,12 @@ Return JSON:
   "swipe_phrases": [
     "Exact phrase or adapted version we can use in our copy"
   ],
-  "fact_checks": [
+  "reality_checks": [
     {{
-      "claim": "A specific claim or stat from the reel",
-      "verdict": "verified|outdated|better_alternative|unverified",
-      "explanation": "Why this verdict",
-      "better_alternative": "If outdated or better_alternative, what to use instead"
+      "claim": "A specific claim, strategy, or recommendation from the reel",
+      "verdict": "solid|plausible|questionable|misleading",
+      "explanation": "Why this verdict — reference audience comments if they confirm or contradict",
+      "better_alternative": "If questionable or misleading, what to do instead"
     }}
   ],
   "routing_target": "claude-upgrades|ddb|tfww|n8n-automations|ghl-fix|aias",
@@ -172,11 +174,16 @@ Rules for swipe_phrases:
 - Pull EXACT powerful phrases from the transcript, label with [ad], [email], [website], [outreach]
 - Maximum 5 phrases
 
-Rules for fact_checks:
-- Only flag specific claims, stats, or recommendations that could be wrong or outdated
-- "verified" = checked and accurate. "outdated" = was true but no longer. "better_alternative" = works but there's a better way now
+Rules for reality_checks — this is NOT literal fact-checking, it's "is this actually a good idea for us?":
+- Evaluate the core advice/strategy: is it solid, plausible, questionable, or misleading?
+- "solid" = proven approach, audience confirms it works, aligns with our experience
+- "plausible" = sounds right but unproven or context-dependent
+- "questionable" = oversimplified, missing important caveats, or audience pushes back
+- "misleading" = actively bad advice, creator has financial incentive to mislead, or comments call BS
+- USE AUDIENCE COMMENTS as evidence. If commenters share success stories → solid. If they push back → questionable
+- If the creator is selling a course/product related to the advice, note that bias
 - If no claims worth checking, return an empty array
-- Maximum 3 fact checks"""
+- Maximum 3 reality checks"""
 
 VISION_USER_ADDENDUM = """
 
@@ -251,7 +258,7 @@ Return JSON with the same schema as a reel analysis. Adapt the fields:
   ],
   "business_impact": "One sentence on bottom line impact",
   "swipe_phrases": ["Exact text from slides we can reuse"],
-  "fact_checks": [],
+  "reality_checks": [],
   "routing_target": "claude-upgrades|ddb|tfww|n8n-automations|ghl-fix|aias",
   "relevance_score": 0.0-1.0,
   "web_design_insights": [
@@ -277,6 +284,19 @@ Rules for routing_target — pick the SINGLE best folder for this carousel's con
 Apply the same rules as reel analysis for insights, applications, swipe phrases, and relevance_score calibration (most should be 0.85-0.95)."""
 
 
+def _format_comments(metadata: ReelMetadata) -> str:
+    """Format top comments for inclusion in the prompt."""
+    if not metadata.comments:
+        return ""
+    lines = ["**Top Comments:**"]
+    for c in metadata.comments[:5]:
+        author = c.get("author", "?")
+        text = c.get("text", "").replace("\n", " ").strip()
+        if text:
+            lines.append(f'- @{author}: "{text}"')
+    return "\n".join(lines) + "\n"
+
+
 def build_analysis_prompt(
     transcript: TranscriptResult, metadata: ReelMetadata, user_context: str = ""
 ) -> tuple[str, str]:
@@ -284,6 +304,9 @@ def build_analysis_prompt(
         creator=metadata.creator or "Unknown",
         caption=metadata.caption or "No caption",
         duration=metadata.duration,
+        like_count=metadata.like_count,
+        comment_count=metadata.comment_count,
+        comments_section=_format_comments(metadata),
         text=transcript.text,
     )
 
@@ -345,6 +368,9 @@ def build_vision_analysis_prompt(
         creator=metadata.creator or "Unknown",
         caption=metadata.caption or "No caption",
         duration=metadata.duration,
+        like_count=metadata.like_count,
+        comment_count=metadata.comment_count,
+        comments_section=_format_comments(metadata),
         text=transcript.text,
     ) + VISION_USER_ADDENDUM
 
