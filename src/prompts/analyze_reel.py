@@ -183,11 +183,7 @@ Rules for reality_checks — this is NOT literal fact-checking, it's "is this ac
 - "misleading" = actively bad advice, creator has financial incentive to mislead, or comments call BS
 - USE AUDIENCE COMMENTS as evidence. If commenters share success stories → solid. If they push back → questionable
 - If the creator is selling a course/product related to the advice, note that bias
-- RECENCY MATTERS: Check the post date. Different spaces move at different speeds:
-  - AI/tech: 3+ months old = likely outdated tools/APIs/models. Flag newer alternatives
-  - Sales/mindset: Principles are more evergreen, but specific tactics (platforms, pricing) can shift
-  - Marketing: Algorithms and platform rules change frequently, 6+ months = check for updates
-  - If the video recommends a specific tool, API, or platform version, note whether a newer/better option exists now
+- RECENCY MATTERS: Check the post date and consider how fast this particular space moves. AI tooling changes weekly — a video recommending a specific model or API from months ago may already be superseded. Sales principles tend to be more evergreen. Use your judgment based on the actual content. If the video recommends a specific tool, API, model, or platform, consider whether something better has emerged since the post date
 - If no claims worth checking, return an empty array
 - Maximum 3 reality checks"""
 
