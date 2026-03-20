@@ -7,8 +7,8 @@ import asyncio
 import re
 import time
 
-# Serialize reel processing — parallel Whisper + LLM thrashes the container
-_processing_lock = asyncio.Lock()
+# Allow 2 concurrent pipelines — 2 CPU cores, 8GB RAM can handle it
+_processing_semaphore = asyncio.Semaphore(2)
 
 from telegram import Update
 from telegram.ext import ContextTypes
@@ -140,10 +140,10 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text(f"Already processed ({status}): {view_url}")
         return
 
-    if _processing_lock.locked():
-        await update.message.reply_text("Another reel is processing — yours is queued, hang tight.")
+    if _processing_semaphore._value == 0:
+        await update.message.reply_text("2 reels already processing — yours is queued, hang tight.")
 
-    async with _processing_lock:
+    async with _processing_semaphore:
         await _process_reel_locked(update, reel_id, url, user_context, chat_id)
 
 
