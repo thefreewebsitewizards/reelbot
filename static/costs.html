@@ -4,6 +4,8 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>ReelBot — Cost Breakdown</title>
+<meta name="description" content="ReelBot cost tracker — per-plan and per-step LLM cost breakdown.">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🎬</text></svg>">
 <style>
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
   body {
@@ -34,6 +36,7 @@
   }
   .total-value { font-size: 1.5rem; font-weight: 700; color: #a78bfa; }
   .total-label { font-size: 0.75rem; color: #64748b; text-transform: uppercase; margin-top: 2px; }
+  .total-hint { font-size: 0.7rem; color: #475569; margin-top: 4px; }
 
   .step-totals {
     background: #1e293b; border-radius: 8px; padding: 16px; margin-bottom: 24px;
@@ -51,7 +54,7 @@
     cursor: pointer; text-decoration: none; color: inherit;
     transition: background 0.15s;
   }
-  .plan-row:hover { background: #263347; text-decoration: none; }
+  .plan-row:hover { background: #263347; text-decoration: none; transform: translateY(-1px); box-shadow: 0 2px 8px rgba(0,0,0,0.2); }
   .plan-row-top { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
   .plan-row-title { font-weight: 600; color: #f1f5f9; font-size: 0.9rem; }
   .plan-row-cost { font-weight: 700; color: #a78bfa; font-size: 0.95rem; white-space: nowrap; }

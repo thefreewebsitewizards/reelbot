@@ -213,12 +213,14 @@ def costs_page():
         actual_card = (
             f'<div class="total-card">'
             f'<div class="total-value">${total_actual:.4f}</div>'
-            f'<div class="total-label">Actual Cost</div></div>'
+            f'<div class="total-label">Actual Cost</div>'
+            f'<div class="total-hint">Reported by OpenRouter after generation</div></div>'
         )
     totals_html = (
         f'<div class="total-card">'
         f'<div class="total-value">${total_estimated:.4f}</div>'
-        f'<div class="total-label">Estimated Cost</div></div>'
+        f'<div class="total-label">Estimated Cost</div>'
+        f'<div class="total-hint">Based on token counts &times; list price</div></div>'
         f'{actual_card}'
         f'<div class="total-card">'
         f'<div class="total-value">{total_tokens:,}</div>'

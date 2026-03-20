@@ -49,6 +49,22 @@ def _add_processing_entry(reel_id: str, reel_url: str) -> None:
     save_index(index)
 
 
+def _friendly_error(error: str) -> str:
+    """Convert raw error strings to user-friendly labels."""
+    lower = error.lower()
+    if "download" in lower or "yt-dlp" in lower or "extractor" in lower:
+        return "Download failed"
+    if "transcri" in lower or "whisper" in lower or "audio" in lower:
+        return "Transcription failed"
+    if "timeout" in lower or "timed out" in lower:
+        return "Request timed out"
+    if "rate limit" in lower or "429" in lower:
+        return "Rate limited — try again later"
+    if "api" in lower or "openrouter" in lower or "claude" in lower:
+        return "Analysis failed"
+    return "Processing failed"
+
+
 def _update_processing_entry(reel_id: str, status: PlanStatus, error: str = "") -> None:
     """Update the processing entry status (used for marking failures)."""
     index = get_index()
@@ -56,7 +72,8 @@ def _update_processing_entry(reel_id: str, status: PlanStatus, error: str = "") 
         if entry["reel_id"] == reel_id:
             entry["status"] = status.value
             if error:
-                entry["title"] = f"Failed: {error[:100]}"
+                entry["title"] = _friendly_error(error)
+                entry["error_detail"] = error[:300]
             break
     save_index(index)
 

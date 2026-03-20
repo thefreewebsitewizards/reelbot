@@ -4,6 +4,8 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>{{title}}</title>
+<meta name="description" content="ReelBot plan — business strategy insights from Instagram Reel analysis.">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🎬</text></svg>">
 <style>
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
   body {
@@ -102,7 +104,8 @@
     margin-bottom: 10px; cursor: pointer; transition: border-color 0.15s;
     border: 2px solid transparent; display: flex; gap: 12px; align-items: flex-start;
   }
-  .task-card:hover { border-color: #475569; }
+  .task-card:hover { border-color: #475569; transform: translateY(-1px); box-shadow: 0 2px 8px rgba(0,0,0,0.2); }
+  .task-card { transition: border-color 0.15s, transform 0.15s, box-shadow 0.15s; }
   .task-card.selected { border-color: #22c55e; }
   .task-card.resolved { opacity: 0.6; pointer-events: none; }
   .task-check {
@@ -148,8 +151,15 @@
     font-weight: 600; font-size: 0.95rem; color: #fff; transition: opacity 0.2s;
     min-height: 48px;
   }
-  .ctrl-btn:hover { opacity: 0.85; }
+  .ctrl-btn:hover:not(:disabled) { opacity: 0.85; transform: translateY(-1px); box-shadow: 0 2px 8px rgba(0,0,0,0.3); }
+  .ctrl-btn:active:not(:disabled) { transform: translateY(0); }
   .ctrl-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+  .ctrl-btn .spinner {
+    display: inline-block; width: 14px; height: 14px; border: 2px solid rgba(255,255,255,0.3);
+    border-top-color: #fff; border-radius: 50%; animation: spin 0.6s linear infinite;
+    vertical-align: middle; margin-right: 6px;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
   .ctrl-btn.approve { background: #22c55e; }
   .ctrl-btn.skip { background: #64748b; }
   .ctrl-btn.back { background: #475569; }
@@ -166,7 +176,9 @@
     background: transparent; color: #94a3b8; cursor: pointer; font-size: 0.85rem;
     transition: all 0.15s;
   }
-  .fb-btn:hover { border-color: #64748b; color: #e2e8f0; }
+  .fb-btn:hover { border-color: #64748b; color: #e2e8f0; transform: translateY(-1px); }
+  .fb-btn:active { transform: translateY(0); background: #1e293b; }
+  .fb-btn { transition: all 0.15s; }
   .fb-btn.active { border-color: #22c55e; color: #22c55e; }
   .fb-comment {
     width: 100%; background: #0f172a; border: 1px solid #334155; border-radius: 6px;
@@ -293,9 +305,9 @@
 <h2 id="section-insights">Key Insights</h2>
 <ul>{{insights_html}}</ul>
 
-<!-- Our Take — collapsed -->
-<h2 class="collapsible" onclick="toggle(this)">Our Take</h2>
-<div class="collapsible-content">
+<!-- Analysis Notes — open by default -->
+<h2>Analysis Notes</h2>
+<div>
 <div class="section-notes">{{notes_html}}</div>
 </div>
 
@@ -378,8 +390,10 @@ function updateCount() {
 async function approveSelected() {
   var btn = document.getElementById('btn-approve');
   var status = document.getElementById('ctrl-status');
+  var origText = btn.textContent;
   btn.disabled = true;
-  status.textContent = 'Approving...';
+  btn.innerHTML = '<span class="spinner"></span>Approving...';
+  status.textContent = '';
 
   try {
     var res = await fetch('/plans/' + REEL_ID + '/approve', {
@@ -392,7 +406,8 @@ async function approveSelected() {
     });
     if (res.ok) {
       PLAN_STATUS = 'approved';
-      status.textContent = 'Approved! Executing...';
+      btn.innerHTML = 'Approved';
+      status.textContent = 'Executing...';
       document.getElementById('btn-skip').disabled = true;
       document.getElementById('approval-notes').disabled = true;
       var banner = document.getElementById('resolved-banner');
@@ -404,10 +419,12 @@ async function approveSelected() {
     } else {
       var err = await res.json();
       status.textContent = 'Error: ' + (err.detail || res.statusText);
+      btn.innerHTML = origText;
       btn.disabled = false;
     }
   } catch(e) {
     status.textContent = 'Error: ' + e.message;
+    btn.innerHTML = origText;
     btn.disabled = false;
   }
 }
@@ -415,14 +432,17 @@ async function approveSelected() {
 async function skipPlan() {
   var btn = document.getElementById('btn-skip');
   var status = document.getElementById('ctrl-status');
+  var origText = btn.textContent;
   btn.disabled = true;
-  status.textContent = 'Skipping...';
+  btn.innerHTML = '<span class="spinner"></span>Skipping...';
+  status.textContent = '';
 
   try {
     var res = await fetch('/plans/' + REEL_ID + '/skip', { method: 'POST' });
     if (res.ok) {
       PLAN_STATUS = 'skipped';
-      status.textContent = 'Skipped';
+      btn.innerHTML = 'Skipped';
+      status.textContent = '';
       document.getElementById('btn-approve').disabled = true;
       document.getElementById('approval-notes').disabled = true;
       var banner = document.getElementById('resolved-banner');
@@ -430,10 +450,12 @@ async function skipPlan() {
       banner.classList.add('visible');
     } else {
       status.textContent = 'Error: ' + res.statusText;
+      btn.innerHTML = origText;
       btn.disabled = false;
     }
   } catch(e) {
     status.textContent = 'Error: ' + e.message;
+    btn.innerHTML = origText;
     btn.disabled = false;
   }
 }

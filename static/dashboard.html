@@ -4,6 +4,8 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>ReelBot — Dashboard</title>
+<meta name="description" content="ReelBot dashboard — review, approve, and track Instagram Reel analysis plans.">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🎬</text></svg>">
 <style>
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
   body {
@@ -65,7 +67,7 @@
     padding: 12px 16px; margin-bottom: 8px;
     transition: background 0.15s; cursor: pointer; text-decoration: none; color: inherit;
   }
-  .plan-card:hover { background: #263347; text-decoration: none; }
+  .plan-card:hover { background: #263347; text-decoration: none; transform: translateY(-1px); box-shadow: 0 2px 8px rgba(0,0,0,0.2); }
   .plan-card-top { display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; }
   .plan-title { font-weight: 600; color: #f1f5f9; font-size: 0.95rem; }
   .plan-theme { color: #94a3b8; font-size: 0.8rem; font-style: italic; margin-top: 2px; }
@@ -140,6 +142,8 @@
 
 {{categories_html}}
 
+<div class="empty-state" id="no-match" style="display:none;">No plans match your filters.</div>
+
 <script>
 function toggleCategory(el) {
   const plans = el.nextElementSibling;
@@ -157,11 +161,16 @@ function filterPlans() {
     const matchS = !status || cardStatus === status;
     card.style.display = (matchQ && matchS) ? '' : 'none';
   });
+  var anyVisible = false;
   document.querySelectorAll('.category-section').forEach(sec => {
     const visible = sec.querySelectorAll('.plan-card[style=""], .plan-card:not([style])');
     const hidden = sec.querySelectorAll('.plan-card[style*="none"]');
-    sec.style.display = (visible.length === 0 && hidden.length > 0) ? 'none' : '';
+    const show = visible.length > 0 || hidden.length === 0;
+    sec.style.display = show ? '' : 'none';
+    if (show && visible.length > 0) anyVisible = true;
   });
+  var hasFilters = q || status;
+  document.getElementById('no-match').style.display = (!anyVisible && hasFilters) ? '' : 'none';
 }
 </script>
 
