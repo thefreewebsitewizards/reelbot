@@ -1,3 +1,4 @@
+import threading
 from pathlib import Path
 from loguru import logger
 
@@ -6,18 +7,21 @@ from src.models import TranscriptResult
 
 # Lazy-load the model to avoid slow startup
 _model = None
+_model_lock = threading.Lock()
 
 
 def _get_model():
     global _model
     if _model is None:
-        from faster_whisper import WhisperModel
-        logger.info(f"Loading Whisper model: {settings.whisper_model} ({settings.whisper_compute_type})")
-        _model = WhisperModel(
-            settings.whisper_model,
-            device=settings.whisper_device,
-            compute_type=settings.whisper_compute_type,
-        )
+        with _model_lock:
+            if _model is None:
+                from faster_whisper import WhisperModel
+                logger.info(f"Loading Whisper model: {settings.whisper_model} ({settings.whisper_compute_type})")
+                _model = WhisperModel(
+                    settings.whisper_model,
+                    device=settings.whisper_device,
+                    compute_type=settings.whisper_compute_type,
+                )
     return _model
 
 

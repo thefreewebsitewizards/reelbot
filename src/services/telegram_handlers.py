@@ -7,6 +7,9 @@ import asyncio
 import re
 import time
 
+# Serialize reel processing — parallel Whisper + LLM thrashes the container
+_processing_lock = asyncio.Lock()
+
 from telegram import Update
 from telegram.ext import ContextTypes
 from loguru import logger
@@ -137,6 +140,15 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text(f"Already processed ({status}): {view_url}")
         return
 
+    if _processing_lock.locked():
+        await update.message.reply_text("Another reel is processing — yours is queued, hang tight.")
+
+    async with _processing_lock:
+        await _process_reel_locked(update, reel_id, url, user_context, chat_id)
+
+
+async def _process_reel_locked(update, reel_id, url, user_context, chat_id):
+    """Process a reel while holding the processing lock."""
     from src.utils.processing_stats import get_estimate, record_time
 
     t0 = time.monotonic()
