@@ -10,6 +10,10 @@ import time
 # Allow 2 concurrent pipelines — 2 CPU cores, 8GB RAM can handle it
 _processing_semaphore = asyncio.Semaphore(2)
 
+# Pause mode: queue URLs without processing
+_paused = False
+_paused_queue: list[dict] = []
+
 from telegram import Update
 from telegram.ext import ContextTypes
 from loguru import logger
@@ -59,7 +63,9 @@ async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "Send me an Instagram Reel link and I'll analyze it.\n\n"
         "Commands:\n"
         "/status -- Show execution summary\n"
-        "/plans -- Show all plans\n\n"
+        "/plans -- Show all plans\n"
+        "/pause -- Queue reels without processing\n"
+        "/resume -- Process all queued reels\n\n"
         "Review and approve plans at the web dashboard."
     )
 
@@ -112,6 +118,40 @@ async def cmd_plans(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text("\n".join(lines), parse_mode="Markdown")
 
 
+async def cmd_pause(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Pause processing — reels get queued but not processed."""
+    global _paused
+    _paused = True
+    await update.message.reply_text(
+        f"Paused. Send reels and they'll be queued.\n"
+        f"Use /resume to process the queue ({len(_paused_queue)} queued so far)."
+    )
+
+
+async def cmd_resume(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Resume processing and drain the queued reels."""
+    global _paused
+    _paused = False
+    queue = list(_paused_queue)
+    _paused_queue.clear()
+
+    if not queue:
+        await update.message.reply_text("Resumed. No queued reels to process.")
+        return
+
+    await update.message.reply_text(f"Resumed. Processing {len(queue)} queued reel(s)...")
+    for item in queue:
+        asyncio.create_task(
+            _process_queued_reel(update, item["reel_id"], item["url"], item["user_context"], item["chat_id"])
+        )
+
+
+async def _process_queued_reel(update, reel_id, url, user_context, chat_id):
+    """Process a reel from the paused queue."""
+    async with _processing_semaphore:
+        await _process_reel_locked(update, reel_id, url, user_context, chat_id)
+
+
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = (update.message.text or "").strip()
     chat_id = update.message.chat.id
@@ -140,8 +180,17 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text(f"Already processed ({status}): {view_url}")
         return
 
+    # Pause mode: queue without processing
+    if _paused:
+        _paused_queue.append({"reel_id": reel_id, "url": url, "user_context": user_context, "chat_id": chat_id})
+        await update.message.reply_text(f"Queued: {reel_id} ({len(_paused_queue)} in queue)")
+        return
+
+    # Acknowledge immediately, before waiting for semaphore
     if _processing_semaphore._value == 0:
-        await update.message.reply_text("2 reels already processing — yours is queued, hang tight.")
+        await update.message.reply_text(f"Got it ({reel_id}) — 2 reels processing, yours is queued.")
+    else:
+        await update.message.reply_text(f"Got it ({reel_id}) — processing now...")
 
     async with _processing_semaphore:
         await _process_reel_locked(update, reel_id, url, user_context, chat_id)

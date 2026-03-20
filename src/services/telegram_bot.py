@@ -21,6 +21,8 @@ from src.services.telegram_handlers import (
     cmd_start,
     cmd_status,
     cmd_plans,
+    cmd_pause,
+    cmd_resume,
     handle_inline_button,
     handle_message,
 )
@@ -58,6 +60,8 @@ def start_bot():
     _bot_app.add_handler(CommandHandler("start", cmd_start))
     _bot_app.add_handler(CommandHandler("status", cmd_status))
     _bot_app.add_handler(CommandHandler("plans", cmd_plans))
+    _bot_app.add_handler(CommandHandler("pause", cmd_pause))
+    _bot_app.add_handler(CommandHandler("resume", cmd_resume))
     _bot_app.add_handler(CallbackQueryHandler(handle_inline_button))
     _bot_app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
 
