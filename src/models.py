@@ -1,6 +1,6 @@
 from datetime import datetime
 from enum import Enum
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 
 class PlanStatus(str, Enum):
@@ -14,8 +14,17 @@ class PlanStatus(str, Enum):
 
 
 class ReelRequest(BaseModel):
-    reel_url: str
-    context: str = ""  # Optional user notes about what to focus on
+    reel_url: str = Field(max_length=2048)
+    context: str = Field(default="", max_length=2000)
+
+    @field_validator("reel_url")
+    @classmethod
+    def validate_reel_url(cls, v: str) -> str:
+        """Ensure the URL looks like an Instagram reel/post URL."""
+        v = v.strip()
+        if not v.startswith(("https://www.instagram.com/", "https://instagram.com/")):
+            raise ValueError("URL must be an Instagram URL (https://instagram.com/...)")
+        return v
 
 
 class ReelMetadata(BaseModel):

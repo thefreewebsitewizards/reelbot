@@ -72,7 +72,9 @@
   .collapsible-content.open { display: block; }
   .badge-route { background: #0891b2; margin-left: 4px; vertical-align: middle; }
   table { width: 100%; border-collapse: collapse; }
-  table th, table td { padding: 6px 10px; text-align: left; }
+  table th { padding: 8px 10px; text-align: left; color: #94a3b8; font-size: 0.85rem; font-weight: 600; border-bottom: 1px solid #334155; }
+  table td { padding: 8px 10px; text-align: left; color: #cbd5e1; }
+  table tr:not(:last-child) td { border-bottom: 1px solid #293548; }
   .cost-table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
 
   /* Nav bar */
@@ -86,7 +88,7 @@
   .nav-bar a { color: #60a5fa; white-space: nowrap; }
   .nav-title { color: #94a3b8; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; }
   .nav-links { display: flex; gap: 8px; }
-  .nav-links a { color: #64748b; }
+  .nav-links a { color: #78849b; }
   .nav-links a:hover { color: #e2e8f0; }
 
   /* Control panel */
@@ -102,7 +104,7 @@
   }
   .task-card:hover { border-color: #475569; }
   .task-card.selected { border-color: #22c55e; }
-  .task-card.resolved { opacity: 0.5; pointer-events: none; }
+  .task-card.resolved { opacity: 0.6; pointer-events: none; }
   .task-check {
     width: 22px; height: 22px; border-radius: 4px; border: 2px solid #475569;
     flex-shrink: 0; margin-top: 2px; display: flex; align-items: center;
@@ -149,7 +151,7 @@
   .ctrl-btn:hover { opacity: 0.85; }
   .ctrl-btn:disabled { opacity: 0.4; cursor: not-allowed; }
   .ctrl-btn.approve { background: #22c55e; }
-  .ctrl-btn.skip { background: #ef4444; }
+  .ctrl-btn.skip { background: #64748b; }
   .ctrl-btn.back { background: #475569; }
   .ctrl-count { color: #94a3b8; font-size: 0.85rem; }
   .ctrl-status { color: #94a3b8; font-size: 0.85rem; margin-left: auto; }
@@ -198,7 +200,7 @@
     .hook { padding: 8px 12px; }
     .point-list li { padding: 8px 10px 8px 32px; font-size: 0.9rem; }
     .similarity-callout { padding: 10px 12px; font-size: 0.85rem; }
-    table th, table td { padding: 4px 6px; font-size: 0.8rem; white-space: nowrap; }
+    table th, table td { padding: 6px 8px; font-size: 0.8rem; }
     .collapsible-content { display: block; }
     .collapsible::after { content: " −"; }
     .nav-links { display: none; }
@@ -263,7 +265,7 @@
   <textarea class="notes-area" id="approval-notes" placeholder="Any notes? (optional)"></textarea>
   <div class="control-actions">
     <button class="ctrl-btn approve" id="btn-approve" onclick="approveSelected()">Approve selected</button>
-    <button class="ctrl-btn skip" id="btn-skip" onclick="skipPlan()">Skip</button>
+    <button class="ctrl-btn skip" id="btn-skip" onclick="skipPlan()">Skip plan</button>
     <button class="ctrl-btn back" onclick="location.href='/'">Dashboard</button>
     <span class="ctrl-count" id="selected-count">0 selected</span>
     <span class="ctrl-status" id="ctrl-status"></span>
@@ -279,7 +281,7 @@
 </div>
 </div>
 
-<div id="section-social">{{social_media_html}}</div>
+{{social_media_html}}
 
 <!-- Video Breakdown — collapsed by default -->
 <h2 class="collapsible" onclick="toggle(this)" id="section-video">What This Video Covers</h2>

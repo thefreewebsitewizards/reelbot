@@ -2,10 +2,11 @@ import json
 import threading
 from datetime import datetime
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from loguru import logger
 
 from src.config import settings
+from src.utils.auth import require_api_key
 from src.models import (
     ReelRequest, PipelineResult, PlanStatus, TranscriptResult,
     CostBreakdown, AnalysisResult, ReelMetadata, SimilarityResult,
@@ -270,7 +271,7 @@ def _run_pipeline(reel_id: str, reel_url: str, user_context: str = "") -> None:
 
 
 @router.post("/process-reel", status_code=202)
-def process_reel(request: ReelRequest) -> dict:
+def process_reel(request: ReelRequest, _: str = Depends(require_api_key)) -> dict:
     """Accept a reel for processing. Returns 202 immediately; pipeline runs in the background."""
     try:
         reel_id = extract_shortcode(request.reel_url)

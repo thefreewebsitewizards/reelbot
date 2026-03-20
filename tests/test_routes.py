@@ -192,7 +192,7 @@ def test_skip_plan(client, plans_dir):
 
     # Verify index was updated
     index = json.loads((plans_dir / "_index.json").read_text())
-    assert index["plans"][0]["status"] == "failed"
+    assert index["plans"][0]["status"] == "skipped"
 
 
 def test_skip_plan_not_found(client, plans_dir):
@@ -207,22 +207,18 @@ def test_skip_plan_not_found(client, plans_dir):
 
 
 def test_process_reel_requires_auth(client, plans_dir):
-    """POST /process-reel does NOT use require_api_key dependency.
-    It is open (no auth). A valid URL should be accepted, not rejected with 401.
-    Verify by sending a request without auth header — should NOT get 401."""
+    """POST /process-reel requires API key authentication.
+    A request without auth header should be rejected with 401."""
     _write_index(plans_dir, [])
-    with patch("src.routers.reel._run_pipeline"), \
-         patch("src.routers.reel._add_processing_entry"):
-        resp = client.post(
-            "/process-reel",
-            json={"reel_url": "https://www.instagram.com/reel/ABC123/"},
-        )
-    # Should not be 401 since no auth is required on this endpoint
-    assert resp.status_code != 401
+    resp = client.post(
+        "/process-reel",
+        json={"reel_url": "https://www.instagram.com/reel/ABC123/"},
+    )
+    assert resp.status_code == 401
 
 
 def test_process_reel_accepts_valid_url(client, plans_dir):
-    """POST /process-reel with a valid Instagram URL returns 202."""
+    """POST /process-reel with a valid Instagram URL and API key returns 202."""
     _write_index(plans_dir, [])
 
     with patch("src.routers.reel.threading") as mock_threading:
@@ -232,6 +228,7 @@ def test_process_reel_accepts_valid_url(client, plans_dir):
         resp = client.post(
             "/process-reel",
             json={"reel_url": "https://www.instagram.com/reel/VALID123/"},
+            headers={"X-API-Key": "test-key"},
         )
 
     assert resp.status_code == 202
@@ -242,12 +239,13 @@ def test_process_reel_accepts_valid_url(client, plans_dir):
 
 
 def test_process_reel_rejects_invalid_url(client, plans_dir):
-    """POST /process-reel with a non-Instagram URL returns 400."""
+    """POST /process-reel with a non-Instagram URL returns 422 (validation error)."""
     resp = client.post(
         "/process-reel",
         json={"reel_url": "https://example.com/not-instagram"},
+        headers={"X-API-Key": "test-key"},
     )
-    assert resp.status_code == 400
+    assert resp.status_code == 422
 
 
 def test_process_reel_rejects_duplicate(client, plans_dir):
@@ -258,5 +256,6 @@ def test_process_reel_rejects_duplicate(client, plans_dir):
     resp = client.post(
         "/process-reel",
         json={"reel_url": "https://www.instagram.com/reel/DUP123/"},
+        headers={"X-API-Key": "test-key"},
     )
     assert resp.status_code == 409

@@ -80,12 +80,16 @@
   .badge-in_progress { background: #3b82f6; }
   .badge-completed { background: #6b7280; }
   .badge-failed { background: #ef4444; }
+  .badge-skipped { background: #94a3b8; }
   .badge-relevance { border: 1px solid #334155; background: transparent; }
   .badge-cost { background: #7c3aed; }
   .badge-route { background: #0891b2; }
 
   .plan-date { color: #64748b; font-size: 0.75rem; }
   .empty-state { color: #64748b; text-align: center; padding: 40px; }
+  .nav-links { display: flex; gap: 16px; font-size: 0.85rem; margin-bottom: 16px; }
+  .nav-links a { color: #64748b; }
+  .nav-links a:hover { color: #e2e8f0; }
 
   @media (max-width: 600px) {
     body { padding: 10px; }
@@ -121,9 +125,15 @@
       <option value="approved">Approved</option>
       <option value="in_progress">In Progress</option>
       <option value="completed">Completed</option>
+      <option value="skipped">Skipped</option>
       <option value="failed">Failed</option>
     </select>
   </div>
+</div>
+
+<div class="nav-links">
+  <a href="/costs">Cost Tracker</a>
+  <a href="/script">Sales Script</a>
 </div>
 
 {{stats_html}}

@@ -23,7 +23,7 @@ def extract_shortcode(url: str) -> str:
         match = re.search(pattern, url)
         if match:
             return match.group(1)
-    raise ValueError(f"Could not extract shortcode from URL: {url}")
+    raise ValueError(f"Could not extract shortcode from URL: {url[:120]}")
 
 
 def download_reel(url: str, output_dir: Path) -> tuple[Path | list[Path], ReelMetadata]:

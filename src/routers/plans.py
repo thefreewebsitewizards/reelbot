@@ -1,10 +1,12 @@
 import json
 import logging
+import re
 from pathlib import Path
+from typing import Literal
 
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import HTMLResponse
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from src.config import settings
 from src.models import PlanStatus
@@ -27,8 +29,23 @@ class StatusUpdate(BaseModel):
 
 
 class ApproveRequest(BaseModel):
-    selected_tasks: list[int]
-    notes: str = ""
+    selected_tasks: list[int] = Field(max_length=50)
+    notes: str = Field(default="", max_length=2000)
+
+
+class FeedbackRequest(BaseModel):
+    rating: Literal["good", "bad", "partial"]
+    comment: str = Field(default="", max_length=2000)
+
+
+_REEL_ID_PATTERN = re.compile(r"^[A-Za-z0-9_-]{1,64}$")
+
+
+def _validate_reel_id(reel_id: str) -> str:
+    """Validate reel_id to prevent path traversal or injection."""
+    if not _REEL_ID_PATTERN.match(reel_id):
+        raise HTTPException(status_code=400, detail="Invalid reel ID format")
+    return reel_id
 
 
 @router.get("/")
@@ -50,19 +67,30 @@ def list_approved():
 
 @router.get("/{reel_id}/view", response_class=HTMLResponse)
 def view_plan(reel_id: str):
-    """Serve the pre-rendered HTML view of a plan."""
+    """Serve the pre-rendered HTML view of a plan with live status."""
+    _validate_reel_id(reel_id)
     entry = find_plan_by_id(reel_id)
     if not entry:
         raise HTTPException(status_code=404, detail=f"Plan not found: {reel_id}")
     html_path = settings.plans_dir / entry["plan_dir"] / "view.html"
     if not html_path.exists():
         raise HTTPException(status_code=404, detail="HTML view not generated for this plan")
-    return HTMLResponse(html_path.read_text())
+    html = html_path.read_text()
+    # Inject live status from index (pre-rendered HTML bakes in the
+    # status at creation time, which goes stale after approve/skip/complete)
+    live_status = entry.get("status", "review")
+    html = re.sub(
+        r"var PLAN_STATUS = '[^']*';",
+        f"var PLAN_STATUS = '{live_status}';",
+        html,
+    )
+    return HTMLResponse(html)
 
 
 @router.get("/{reel_id}")
 def get_plan(reel_id: str):
     """Get full plan data for a specific reel."""
+    _validate_reel_id(reel_id)
     entry = find_plan_by_id(reel_id)
     if not entry:
         raise HTTPException(status_code=404, detail=f"Plan not found: {reel_id}")
@@ -72,6 +100,7 @@ def get_plan(reel_id: str):
 @router.patch("/{reel_id}/status")
 def update_status(reel_id: str, body: StatusUpdate, _: str = Depends(require_api_key)):
     """Update a plan's status."""
+    _validate_reel_id(reel_id)
     updated = update_plan_status(reel_id, body.status)
     if not updated:
         raise HTTPException(status_code=404, detail=f"Plan not found: {reel_id}")
@@ -81,6 +110,7 @@ def update_status(reel_id: str, body: StatusUpdate, _: str = Depends(require_api
 @router.post("/{reel_id}/approve")
 def approve_plan(reel_id: str, body: ApproveRequest):
     """Approve a plan with selected tasks. No API key required (web UI use)."""
+    _validate_reel_id(reel_id)
     entry = find_plan_by_id(reel_id)
     if not entry:
         raise HTTPException(status_code=404, detail=f"Plan not found: {reel_id}")
@@ -193,30 +223,26 @@ def _notify_plan_approved(reel_id: str, plan_data: dict, selected_tasks: list[in
 @router.post("/{reel_id}/skip")
 def skip_plan(reel_id: str):
     """Skip/reject a plan. No API key required (web UI use)."""
+    _validate_reel_id(reel_id)
     entry = find_plan_by_id(reel_id)
     if not entry:
         raise HTTPException(status_code=404, detail=f"Plan not found: {reel_id}")
 
-    update_plan_status(reel_id, PlanStatus.FAILED)
+    update_plan_status(reel_id, PlanStatus.SKIPPED)
     return {"reel_id": reel_id, "status": "skipped"}
 
 
 @router.post("/{reel_id}/feedback")
-def submit_feedback(reel_id: str, body: dict):
+def submit_feedback(reel_id: str, body: FeedbackRequest):
     """Save feedback for a plan."""
+    _validate_reel_id(reel_id)
     from src.utils.feedback import save_feedback, update_feedback_comment
 
-    rating = body.get("rating", "")
-    comment = body.get("comment", "")
+    save_feedback(reel_id, body.rating)
+    if body.comment:
+        update_feedback_comment(reel_id, body.comment)
 
-    if rating not in ("good", "bad", "partial"):
-        raise HTTPException(status_code=400, detail="Rating must be good, bad, or partial")
-
-    save_feedback(reel_id, rating)
-    if comment:
-        update_feedback_comment(reel_id, comment)
-
-    return {"reel_id": reel_id, "rating": rating}
+    return {"reel_id": reel_id, "rating": body.rating}
 
 
 @router.get("/summary/all")
@@ -228,6 +254,7 @@ def summary():
 @router.post("/{reel_id}/execute")
 def execute_plan_endpoint(reel_id: str, _: str = Depends(require_api_key)):
     """Manually trigger execution of an approved plan."""
+    _validate_reel_id(reel_id)
     entry = find_plan_by_id(reel_id)
     if not entry:
         raise HTTPException(status_code=404, detail=f"Plan {reel_id} not found")
@@ -254,6 +281,7 @@ def list_tasks(reel_id: str):
     This is the primary endpoint for external agents (Claude Code, OpenClaw)
     to discover what work needs doing.
     """
+    _validate_reel_id(reel_id)
     entry = find_plan_by_id(reel_id)
     if not entry:
         raise HTTPException(status_code=404, detail=f"Plan not found: {reel_id}")
@@ -277,6 +305,8 @@ def list_tasks(reel_id: str):
         for r in log.get("auto_results", []):
             executed[r["task_index"]] = r
 
+    _VALID_TASK_STATUSES = {"pending", "completed", "failed", "needs_human"}
+
     tasks = []
     for i, task in enumerate(plan_data.get("tasks", [])):
         # Filter by approved level (cumulative: L2 includes L1 tasks)
@@ -287,7 +317,8 @@ def list_tasks(reel_id: str):
         exec_result = executed.get(i)
         task_status = "pending"
         if exec_result:
-            task_status = exec_result.get("status", "completed")
+            raw_status = exec_result.get("status", "completed")
+            task_status = raw_status if raw_status in _VALID_TASK_STATUSES else "pending"
         elif task.get("requires_human"):
             task_status = "needs_human"
 
@@ -314,8 +345,8 @@ def list_tasks(reel_id: str):
 
 
 class TaskCompletion(BaseModel):
-    status: str = "completed"  # completed or failed
-    notes: str = ""
+    status: Literal["completed", "failed"] = "completed"
+    notes: str = Field(default="", max_length=2000)
 
 
 @router.patch("/{reel_id}/tasks/{task_index}")
@@ -324,6 +355,7 @@ def update_task(reel_id: str, task_index: int, body: TaskCompletion, _: str = De
 
     Updates the execution_log.json in the plan directory.
     """
+    _validate_reel_id(reel_id)
     entry = find_plan_by_id(reel_id)
     if not entry:
         raise HTTPException(status_code=404, detail=f"Plan not found: {reel_id}")

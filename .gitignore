@@ -41,3 +41,4 @@ telegramlogs.txt
 
 # Whisper model cache
 whisper_models/
+.qa/

@@ -1,4 +1,4 @@
-# Session Handoff — 2026-03-16 (Session 17)
+# Session Handoff — 2026-03-19 (Session 18 continued)
 
 ## Project Overview
 - Instagram Reel -> Business Strategy Pipeline (FastAPI + Telegram + OpenRouter LLM)
@@ -6,49 +6,57 @@
 
 ## Completed This Session
 
-### Ops cleanup from session 16's next steps
-- [x] Deployed agent loop to VPS (`reelbot-agent.service` on 217.216.90.203, polling every 60s)
-- [x] Verified Telegram webhook is clear (polling mode works)
-- [x] Deleted 2 stale plans (pre-control-panel, never approved, OpenClaw/Julian Goldie content)
-- [x] Updated `~/.shared-context/reelbot.md` with web control panel, simplified Telegram
-- [x] Saved VPS SSH access details to memory (`reference_vps_access.md`)
+### Similarity + Plan View Redesign (commit `e1a3723`)
+- [x] ContentComparison + ContentResponse models, enriched similarity, social media play section
+- [x] HTML restructured: nav bar, section jump links, comparison + social media sections
+- [x] 33 new tests (108 total at peak)
+- Design doc: `docs/plans/2026-03-16-similarity-planview-redesign.md`
 
-### Reliability + code quality improvements (commit `064d03d`)
-- **CORS restriction**: `allow_origins=["*"]` → env-configurable (`CORS_ORIGINS`), defaults to production domain
-- **Health endpoints**: `/health` (liveness) + `/ready` (checks plans dir, env vars, ffmpeg)
-- **Constants**: `src/constants.py` — all magic numbers centralized (timeouts, retries, limits)
-- **Retry utility**: `src/utils/retry.py` — exponential backoff with jitter, applied to LLM calls + n8n webhook
-- **File splits** (all under 300 lines now):
-  - `plan_writer.py` (638→294) + `html_renderer.py` (236) + `plan_formatter.py` (79)
-  - `executor.py` (406→258) + `tool_handlers.py` (154)
-  - `telegram_bot.py` (507→87) + `telegram_handlers.py` (270) + `telegram_similarity.py` (217)
-- **Route tests**: 14 new tests (health, plans CRUD, auth, reel processing). Total: 75 tests passing
+### Dead Code Cleanup (commit `fe94c21`)
+- [x] Removed all n8n/GHL references (14 files), updated prompts, routing, config
 
-### Design: Similarity + Plan View Redesign
-- Full design doc at `docs/plans/2026-03-16-similarity-planview-redesign.md`
-- User approved design, not yet implemented
+### Claude Code Auto-Execution (commits `fe94c21` → `aa89ba4` → `2d2e560`)
+- [x] Agent loop dispatches `claude -p` for claude_code tasks on VPS (217.216.90.203)
+- [x] Auto-merge with test validation: pass → merge to main, fail → retry once
+- [x] Repos cloned at `/home/openclaw/projects/`, service runs as `openclaw` user
+- [x] Deferred task fix: server-side executor skips claude_code tasks, keeps plan `in_progress`
+- [x] Agent loop polls both `approved` and `in_progress` plans
+
+### Shared Context Overhaul
+- [x] Updated aias.md, tfww.md, ghl-fix.md, n8n-automations.md, ddb.md, reelbot.md
+- [x] Added pricing model to aias.md ($5k + $300/mo + $10/appt)
+- [x] Added shared context sync step to handoff skill + global standards
+
+### QA Run (in progress)
+- [x] Build: 108 tests passing
+- [x] Integration: all endpoints return correct responses
+- [x] Navigator: all 8 routes load clean
+- [x] Breaker: **fixed** TaskCompletion status validation (now `Literal["completed", "failed"]`)
+- [x] Interactor: all flows work, noted duplicate KB entry from reprocessing same reel
+- [x] Improver: 5 improvement ideas saved to `.qa/improvement-ideas.md`
+- [ ] **Still running**: security, reasoner, visual, data integrity agents
+
+### Uncommitted Changes
+- Breaker's fix: `src/routers/plans.py` — `TaskCompletion.status` now `Literal["completed", "failed"]`
+- Shared context sync: `shared-context/*.md` files
+- `.qa/` directory (gitignored)
 
 ## Next Steps
-
-- [ ] **Implement similarity + plan view redesign** — the approved design doc covers everything:
-  1. Enrich similarity check to load actual plan.md content and produce per-area comparisons (`src/services/planner.py`, `src/models.py`)
-  2. Add `ContentComparison` model with verdict (better/worse/same/different_angle) + `ContentResponse` for social media plays
-  3. Feed comparison context into planner prompt, add `change_type` to tasks (addition/replacement/reinforcement/ignore)
-  4. Restructure HTML: nav bar + section jump links, reorder (applications + levels before tasks), new "Comparison to Current State" and "Social Media Play" sections, remove bloat (swipe phrases, standalone DDB angle)
-  5. Update Telegram similarity message with actual comparison details
-  6. Update tests for new model fields
-- [ ] **Test the full flow** — send a reel, verify: Telegram notification → web control panel → approve → execution
+- [ ] **Check remaining QA agents** — security, reasoner, visual, data. Read their output files at `/tmp/claude-1000/.../tasks/`
+- [ ] **Commit QA fixes** — breaker's TaskCompletion validation fix + any other agent fixes
+- [ ] **Deploy** — push to main + redeploy agent loop
+- [ ] **Test full E2E flow** — send a reel, approve with claude_code task, watch agent loop execute it on VPS
+- [ ] **Address QA improvement ideas** — favicon, loading states on buttons, empty filter state, costs page explanation
 
 ## Key Decisions
-- Pull actual plan.md content for similarity comparisons (quality over token cost)
-- Social media section is a proper section (react/correct/repurpose), not just a one-liner
-- L3 task splitting preserved (user liked cherry-picking individual L3 tasks)
-- Swipe phrases section removed (rarely populated, not actionable)
-- DDB content angle folded into social media section or L3 tasks
+- Auto-merge with test validation instead of PRs (user is a vibe coder)
+- claude_code tasks deferred to VPS agent loop, not executed server-side
+- n8n/GHL fully decommissioned — zero references remain
+- Shared context sync enforced in handoff skill + global standards
 
 ## Context Notes
-- `approval_notes` saved in metadata.json but not yet read by executor
-- `_handle_generate_anyway` in `telegram_similarity.py` loads analysis from disk and generates plan
-- The approve endpoint auto-triggers execution in a background thread
-- Re-exports in split files maintain backward compatibility (tests still patch original module paths)
-- `CORS_ORIGINS` env var not yet added to production .env (uses default which is correct for prod)
+- QA agent IDs for resuming: security=`adaea7c2d486af138`, reasoner=`a1006d598c9307edc`, visual=`ab9e8fa4c454a0362`, data=`a4c91ccae20e423b9`
+- The approve endpoint is intentionally unauthenticated (web UI use)
+- `TEST_COMMANDS` dict in `agent_loop.py` maps repo names to test commands
+- Production container name changes on every deploy — always re-discover via `docker ps | grep l0g48c8`
+- VPS git uses HTTPS via `gh auth setup-git` (no SSH key needed)

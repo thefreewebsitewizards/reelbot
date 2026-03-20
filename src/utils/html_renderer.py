@@ -299,10 +299,10 @@ def _build_cost_table(result: PipelineResult) -> str:
     return (
         f'<h2><a href="/costs" style="color:#f8fafc;text-decoration:none;">Cost Breakdown &#8594;</a></h2>'
         f'<div class="card"><div class="cost-table-wrap"><table>'
-        f'<tr style="color:#94a3b8;text-align:left;"><th>Step</th><th>Prompt</th>'
+        f'<tr><th>Step</th><th>Prompt</th>'
         f'<th>Completion</th><th>Cost</th></tr>'
         f'{cost_rows}'
-        f'<tr style="border-top:1px solid #334155;font-weight:600;">'
-        f'<td>Total</td><td colspan="2"></td><td>${cb.total_cost_usd:.4f}</td></tr>'
+        f'<tr style="border-top:1px solid #475569;font-weight:600;">'
+        f'<td style="color:#f1f5f9;">Total</td><td colspan="2"></td><td style="color:#f1f5f9;">${cb.total_cost_usd:.4f}</td></tr>'
         f'</table></div></div>'
     )
