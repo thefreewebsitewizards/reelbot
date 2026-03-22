@@ -51,7 +51,7 @@ _last_reel: dict[int, str] = {}
 
 # Message logs for debugging
 _CHAT_LOG_JSONL = Path(settings.plans_dir) / "_chat_log.jsonl"
-_CHAT_LOG_TXT = Path(__file__).resolve().parent.parent.parent / "telegramlogs.txt"
+_CHAT_LOG_TXT = Path(settings.plans_dir) / "_telegramlogs.txt"
 
 
 def _log_message(chat_id: int, text: str, direction: str = "in", sender: str = "") -> None:

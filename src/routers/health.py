@@ -60,8 +60,22 @@ async def ready():
 
 
 @router.get("/chat-log")
-def chat_log(tail: int = Query(default=50, le=200), _: str = Depends(require_api_key)):
-    """Read recent Telegram chat log entries (API key required)."""
+def chat_log(
+    tail: int = Query(default=50, le=200),
+    fmt: str = Query(default="json", pattern="^(json|txt)$"),
+    _: str = Depends(require_api_key),
+):
+    """Read recent Telegram chat log entries (API key required).
+
+    ?fmt=json returns JSONL entries, ?fmt=txt returns human-readable log.
+    """
+    if fmt == "txt":
+        log_path = Path(settings.plans_dir) / "_telegramlogs.txt"
+        if not log_path.exists():
+            return {"messages": []}
+        lines = log_path.read_text().strip().split("\n")
+        return {"messages": lines[-tail:]}
+
     log_path = Path(settings.plans_dir) / "_chat_log.jsonl"
     if not log_path.exists():
         return {"messages": []}
