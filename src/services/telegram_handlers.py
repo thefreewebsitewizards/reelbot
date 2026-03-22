@@ -7,9 +7,8 @@ import asyncio
 import re
 import time
 
-# Allow 2 concurrent pipelines — 2 CPU cores, 8GB RAM can handle it
-_processing_semaphore = asyncio.Semaphore(2)
-_active_count = 0  # Track active pipelines (public alternative to _semaphore._value)
+# Track active pipelines for status messages
+_active_count = 0
 
 # Pause mode: queue URLs without processing
 _paused = False
@@ -149,8 +148,7 @@ async def cmd_resume(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def _process_queued_reel(update, reel_id, url, user_context, chat_id):
     """Process a reel from the paused queue."""
-    async with _processing_semaphore:
-        await _process_reel_locked(update, reel_id, url, user_context, chat_id)
+    await _process_reel_locked(update, reel_id, url, user_context, chat_id)
 
 
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -163,38 +161,57 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
         return
 
-    url_match = re.search(r"https?://[^\s]+instagram\.com/[^\s]+", text)
-    url = url_match.group(0) if url_match else text
-    user_context = text.replace(url, "").strip() if url_match else ""
+    # Extract all Instagram URLs from the message
+    urls = re.findall(r"https?://[^\s]+instagram\.com/[^\s]+", text)
+    if not urls:
+        urls = [text]
 
-    try:
-        reel_id = extract_shortcode(url)
-    except ValueError as e:
-        await update.message.reply_text(f"Invalid URL: {e}")
+    # Strip URLs from text to get user context
+    user_context = text
+    for u in urls:
+        user_context = user_context.replace(u, "")
+    user_context = user_context.strip()
+
+    # Collect valid reels, skip duplicates
+    reels = []
+    for url in urls:
+        try:
+            reel_id = extract_shortcode(url)
+        except ValueError:
+            continue
+
+        if is_duplicate(reel_id):
+            entry = find_plan_by_id(reel_id)
+            base_url = settings.public_url or f"http://{settings.host}:{settings.port}"
+            view_url = f"{base_url}/plans/{reel_id}/view"
+            status = entry["status"] if entry else "unknown"
+            await update.message.reply_text(f"Already processed ({status}): {view_url}")
+            continue
+
+        if _paused:
+            _paused_queue.append({"reel_id": reel_id, "url": url, "user_context": user_context, "chat_id": chat_id})
+            await update.message.reply_text(f"Queued: {reel_id} ({len(_paused_queue)} in queue)")
+            continue
+
+        reels.append((reel_id, url))
+
+    if not reels:
         return
 
-    if is_duplicate(reel_id):
-        entry = find_plan_by_id(reel_id)
-        base_url = settings.public_url or f"http://{settings.host}:{settings.port}"
-        view_url = f"{base_url}/plans/{reel_id}/view"
-        status = entry["status"] if entry else "unknown"
-        await update.message.reply_text(f"Already processed ({status}): {view_url}")
-        return
-
-    # Pause mode: queue without processing
-    if _paused:
-        _paused_queue.append({"reel_id": reel_id, "url": url, "user_context": user_context, "chat_id": chat_id})
-        await update.message.reply_text(f"Queued: {reel_id} ({len(_paused_queue)} in queue)")
-        return
-
-    # Acknowledge immediately, before waiting for semaphore
-    if _active_count >= 2:
-        await update.message.reply_text(f"Got it ({reel_id}) — 2 reels processing, yours is queued.")
+    # Acknowledge and launch all pipelines concurrently
+    if len(reels) == 1:
+        reel_id, url = reels[0]
+        active = _active_count
+        if active > 0:
+            await update.message.reply_text(f"Got it ({reel_id}) — {active} reel(s) active, adding yours.")
+        else:
+            await update.message.reply_text(f"Got it ({reel_id}) — processing now...")
+        asyncio.create_task(_process_reel_locked(update, reel_id, url, user_context, chat_id))
     else:
-        await update.message.reply_text(f"Got it ({reel_id}) — processing now...")
-
-    async with _processing_semaphore:
-        await _process_reel_locked(update, reel_id, url, user_context, chat_id)
+        ids = ", ".join(r[0] for r in reels)
+        await update.message.reply_text(f"Got {len(reels)} reels ({ids}) — processing all in parallel...")
+        for reel_id, url in reels:
+            asyncio.create_task(_process_reel_locked(update, reel_id, url, user_context, chat_id))
 
 
 async def _process_reel_locked(update, reel_id, url, user_context, chat_id):
