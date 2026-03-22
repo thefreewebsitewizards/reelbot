@@ -1,11 +1,13 @@
+import json
 import os
 import subprocess
 from pathlib import Path
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends, Query
 from fastapi.responses import JSONResponse
 
 from src.config import settings
+from src.utils.auth import require_api_key
 
 router = APIRouter()
 
@@ -55,3 +57,19 @@ async def ready():
             "checks": checks,
         },
     )
+
+
+@router.get("/chat-log")
+def chat_log(tail: int = Query(default=50, le=200), _: str = Depends(require_api_key)):
+    """Read recent Telegram chat log entries (API key required)."""
+    log_path = Path(settings.plans_dir) / "_chat_log.jsonl"
+    if not log_path.exists():
+        return {"messages": []}
+    lines = log_path.read_text().strip().split("\n")
+    entries = []
+    for line in lines[-tail:]:
+        try:
+            entries.append(json.loads(line))
+        except json.JSONDecodeError:
+            continue
+    return {"messages": entries}

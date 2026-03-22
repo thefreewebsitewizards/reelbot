@@ -6,6 +6,7 @@ Delegates similarity flow to telegram_similarity module.
 import asyncio
 import re
 import time
+from pathlib import Path
 
 # Track active pipelines for status messages
 _active_count = 0
@@ -47,6 +48,21 @@ INSTAGRAM_PATTERN = re.compile(r"instagram\.com/(reel|reels|p)/")
 
 # Track last processed reel per chat for quick approve
 _last_reel: dict[int, str] = {}
+
+# Message log for debugging
+_CHAT_LOG = Path(settings.plans_dir) / "_chat_log.jsonl"
+
+
+def _log_message(chat_id: int, text: str, direction: str = "in") -> None:
+    """Append a message to the chat log (JSONL format)."""
+    import json
+    from datetime import datetime
+    try:
+        entry = {"ts": datetime.now().isoformat(), "dir": direction, "chat": chat_id, "text": text[:500]}
+        with open(_CHAT_LOG, "a") as f:
+            f.write(json.dumps(entry) + "\n")
+    except Exception:
+        pass
 
 
 def _esc(text: str) -> str:
@@ -154,6 +170,9 @@ async def _process_queued_reel(update, reel_id, url, user_context, chat_id):
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = (update.message.text or "").strip()
     chat_id = update.message.chat.id
+
+    # Log all incoming messages to file for debugging
+    _log_message(chat_id, text)
 
     if not INSTAGRAM_PATTERN.search(text):
         await update.message.reply_text(
