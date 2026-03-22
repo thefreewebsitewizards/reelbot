@@ -143,20 +143,10 @@ def approve_plan(reel_id: str, body: ApproveRequest):
         meta["approval_notes"] = body.notes
     meta_path.write_text(json.dumps(meta, indent=2))
 
-    # Approve and trigger execution
+    # Approve — update_plan_status triggers execution via _trigger_execution
     update_plan_status(reel_id, PlanStatus.APPROVED)
 
-    from src.services.executor import execute_plan
-    import threading
-
-    thread = threading.Thread(
-        target=execute_plan,
-        args=(reel_id, entry["plan_dir"]),
-        daemon=True,
-    )
-    thread.start()
-
-    # Send Telegram notification (non-blocking, replaces n8n webhook)
+    # Send Telegram notification (non-blocking)
     _notify_plan_approved(reel_id, plan_data, body.selected_tasks)
 
     return {

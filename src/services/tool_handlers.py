@@ -19,7 +19,7 @@ def handle_sales_script(task: dict, tool_data: dict, plan_dir: str) -> str:
 
     # Fallback: try to extract section_id from description/deliverables
     if not section_id:
-        text = task.get("description", "") + " ".join(task.get("deliverables", []))
+        text = task.get("description", "") + " " + " ".join(task.get("deliverables", []))
         match = re.search(r'/api/script/sections/(\w+)', text)
         if match:
             section_id = match.group(1)

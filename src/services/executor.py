@@ -232,8 +232,13 @@ def execute_plan(reel_id: str, plan_dir_name: str) -> dict:
     _notify_execution_complete(reel_id, plan_title, results, len(human_tasks))
 
     all_auto_passed = all(r["status"] == "completed" for r in results)
-    if human_tasks or deferred_tasks:
-        pass  # Keep in_progress -- waiting on human or agent loop
+    all_auto_failed = results and all(r["status"] == "failed" for r in results)
+
+    if all_auto_failed:
+        # All auto tasks failed — mark failed even if human/deferred tasks exist
+        update_plan_status(reel_id, PlanStatus.FAILED)
+    elif human_tasks or deferred_tasks:
+        pass  # Keep in_progress — waiting on human or agent loop
     elif all_auto_passed:
         update_plan_status(reel_id, PlanStatus.COMPLETED)
     else:

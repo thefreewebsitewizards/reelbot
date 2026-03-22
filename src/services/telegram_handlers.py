@@ -9,6 +9,7 @@ import time
 
 # Allow 2 concurrent pipelines — 2 CPU cores, 8GB RAM can handle it
 _processing_semaphore = asyncio.Semaphore(2)
+_active_count = 0  # Track active pipelines (public alternative to _semaphore._value)
 
 # Pause mode: queue URLs without processing
 _paused = False
@@ -187,7 +188,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     # Acknowledge immediately, before waiting for semaphore
-    if _processing_semaphore._value == 0:
+    if _active_count >= 2:
         await update.message.reply_text(f"Got it ({reel_id}) — 2 reels processing, yours is queued.")
     else:
         await update.message.reply_text(f"Got it ({reel_id}) — processing now...")
@@ -198,6 +199,16 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def _process_reel_locked(update, reel_id, url, user_context, chat_id):
     """Process a reel while holding the processing lock."""
+    global _active_count
+    _active_count += 1
+    try:
+        await _process_reel_inner(update, reel_id, url, user_context, chat_id)
+    finally:
+        _active_count -= 1
+
+
+async def _process_reel_inner(update, reel_id, url, user_context, chat_id):
+    """Inner pipeline logic, called from _process_reel_locked."""
     from src.utils.processing_stats import get_estimate, record_time
 
     t0 = time.monotonic()
@@ -242,7 +253,7 @@ async def _process_reel_locked(update, reel_id, url, user_context, chat_id):
 
         base_url = settings.public_url or f"http://{settings.host}:{settings.port}"
         view_url = f"{base_url}/plans/{reel_id}/view"
-        action_line = result.plan.recommended_action or result.plan.summary
+        action_line = result.plan.recommended_action or result.plan.summary or result.plan.theme or "Review the plan for details"
         notification = (
             f"*{_esc(result.plan.title)}*\n"
             f"{_esc(action_line)}\n\n"
@@ -259,8 +270,12 @@ async def _process_reel_locked(update, reel_id, url, user_context, chat_id):
 
     except Exception as e:
         elapsed = int(time.monotonic() - t0)
-        logger.error(f"Telegram pipeline failed after {elapsed}s: {e}")
-        await update.message.reply_text(f"Failed to process reel ({elapsed}s): {e}")
+        logger.error(f"Telegram pipeline failed after {elapsed}s: {e}", exc_info=True)
+        # Don't leak internal error details to user
+        error_type = type(e).__name__
+        await update.message.reply_text(
+            f"Failed to process reel ({elapsed}s). Error type: {error_type}. Check server logs."
+        )
 
 
 async def _run_telegram_pipeline(
@@ -311,13 +326,15 @@ async def _run_telegram_pipeline(
             sim_cr.completion_tokens, sim_cr.cost_usd, sim_cr.generation_id,
         )
 
-    if similarity.recommendation == "skip" or similarity.max_score > 70:
+    if similarity.recommendation == "skip":
         save_analysis_for_resume(reel_id, analysis, metadata, similarity, costs, transcript)
         cleanup_temp_dir(reel_id)
         return (analysis, similarity, costs)
 
     await progress_cb(4, "Generating plan...")
-    plan, plan_cr = await asyncio.to_thread(generate_plan, analysis, metadata, user_context)
+    plan, plan_cr = await asyncio.to_thread(
+        generate_plan, analysis, metadata, user_context, similarity,
+    )
     costs.add(
         "plan", plan_cr.model, plan_cr.prompt_tokens,
         plan_cr.completion_tokens, plan_cr.cost_usd, plan_cr.generation_id,

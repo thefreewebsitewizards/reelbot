@@ -1,12 +1,16 @@
 """Manage plan status transitions and lookups."""
 
 import json
+import threading
 from pathlib import Path
 
 from loguru import logger
 
 from src.config import settings
 from src.models import PlanStatus
+
+# Lock for read-modify-write on _index.json
+_index_lock = threading.Lock()
 
 
 def get_index() -> dict:
@@ -28,21 +32,22 @@ def save_index(index: dict) -> None:
 def update_plan_status(reel_id: str, new_status: PlanStatus) -> bool:
     """Update a plan's status in both _index.json and its metadata.json.
     Returns True if found and updated."""
-    index = get_index()
+    with _index_lock:
+        index = get_index()
 
-    found = False
-    plan_dir_name = None
-    for entry in index["plans"]:
-        if entry["reel_id"] == reel_id:
-            entry["status"] = new_status.value
-            plan_dir_name = entry["plan_dir"]
-            found = True
-            # Only update the last matching entry (most recent)
+        found = False
+        plan_dir_name = None
+        for entry in index["plans"]:
+            if entry["reel_id"] == reel_id:
+                entry["status"] = new_status.value
+                plan_dir_name = entry["plan_dir"]
+                found = True
+                break  # Only update first match
 
-    if not found:
-        return False
+        if not found:
+            return False
 
-    save_index(index)
+        save_index(index)
 
     # Also update metadata.json in the plan directory
     if plan_dir_name:

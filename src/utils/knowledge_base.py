@@ -3,11 +3,14 @@
 Stores insights from reels as searchable entries in a JSON file.
 """
 import json
+import threading
 from datetime import datetime
 from pathlib import Path
 from loguru import logger
 
 from src.config import settings
+
+_kb_lock = threading.Lock()
 
 
 def _kb_path() -> Path:
@@ -38,21 +41,23 @@ def add_entry(
     source_url: str = "",
 ) -> dict:
     """Add a knowledge base entry. Returns the new entry."""
-    entries = _load()
+    with _kb_lock:
+        entries = _load()
 
-    entry = {
-        "id": f"{reel_id}_{int(datetime.now().timestamp())}",
-        "reel_id": reel_id,
-        "title": title,
-        "content": content,
-        "category": category,
-        "tags": tags or [],
-        "source_url": source_url,
-        "created_at": datetime.now().isoformat(),
-    }
+        entry = {
+            "id": f"{reel_id}_{int(datetime.now().timestamp())}",
+            "reel_id": reel_id,
+            "title": title,
+            "content": content,
+            "category": category,
+            "tags": tags or [],
+            "source_url": source_url,
+            "created_at": datetime.now().isoformat(),
+        }
 
-    entries.append(entry)
-    _save(entries)
+        entries.append(entry)
+        _save(entries)
+
     logger.info(f"KB entry added: {title} (reel: {reel_id})")
     return entry
 
