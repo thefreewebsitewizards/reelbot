@@ -199,6 +199,7 @@ def generate_plan(analysis: AnalysisResult, metadata: ReelMetadata, user_context
                 human_reason=t.get("human_reason") or "",
                 level=int(t.get("level", 1)),
                 change_type=t.get("change_type") or "",
+                tool_data=t.get("tool_data") or {},
             ))
 
         plan = ImplementationPlan(

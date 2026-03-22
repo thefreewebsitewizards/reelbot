@@ -4,6 +4,8 @@ import json
 import re
 from loguru import logger
 
+from json_repair import repair_json as _lib_repair_json
+
 
 def extract_json(raw: str, context: str = "") -> dict:
     """Extract JSON object from an LLM response using multiple strategies.
@@ -60,6 +62,15 @@ def extract_json(raw: str, context: str = "") -> dict:
             return json.loads(cleaned)
         except json.JSONDecodeError:
             pass
+
+    # Strategy 6: json-repair library (handles missing quotes, truncation, etc.)
+    try:
+        repaired = _lib_repair_json(text, return_objects=True)
+        if isinstance(repaired, dict):
+            logger.debug(f"[{context}] JSON repaired by json-repair library")
+            return repaired
+    except Exception:
+        pass
 
     # All strategies failed — log the raw response for debugging
     preview = text[:500] + ("..." if len(text) > 500 else "")
