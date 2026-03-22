@@ -4,6 +4,7 @@ from datetime import datetime
 
 from fastapi import APIRouter, Depends, HTTPException
 from loguru import logger
+from pydantic import BaseModel, Field
 
 from src.config import settings
 from src.utils.auth import require_api_key
@@ -318,3 +319,69 @@ def process_reel(request: ReelRequest, _: str = Depends(require_api_key)) -> dic
         "reel_id": reel_id,
         "poll_url": f"/plans/{reel_id}",
     }
+
+
+class BatchRequest(BaseModel):
+    reel_urls: list[str] = Field(max_length=20)
+    context: str = Field(default="", max_length=2000)
+
+
+@router.post("/process-batch", status_code=202)
+def process_batch(request: BatchRequest, _: str = Depends(require_api_key)) -> dict:
+    """Accept multiple reels for parallel processing. Sends Telegram notification for each."""
+    results = []
+    for url in request.reel_urls:
+        try:
+            reel_id = extract_shortcode(url)
+        except ValueError:
+            results.append({"url": url, "status": "invalid_url"})
+            continue
+
+        if is_duplicate(reel_id):
+            results.append({"reel_id": reel_id, "status": "duplicate"})
+            continue
+
+        _add_processing_entry(reel_id, url)
+        thread = threading.Thread(
+            target=_run_pipeline,
+            args=(reel_id, url, request.context),
+            daemon=True,
+            name=f"pipeline-{reel_id}",
+        )
+        thread.start()
+        results.append({"reel_id": reel_id, "status": "processing"})
+
+    processing = [r for r in results if r.get("status") == "processing"]
+    logger.info(f"Batch: {len(processing)} reels dispatched, {len(results) - len(processing)} skipped")
+    return {"results": results, "processing_count": len(processing)}
+
+
+class SendMessageRequest(BaseModel):
+    text: str = Field(max_length=4000)
+
+
+@router.post("/send-telegram")
+def send_telegram(request: SendMessageRequest, _: str = Depends(require_api_key)) -> dict:
+    """Send a message to the Telegram chat via the bot."""
+    from src.services.telegram_bot import get_bot_app, get_bot_loop
+    import asyncio
+
+    chat_id = settings.telegram_chat_id
+    if not chat_id:
+        raise HTTPException(status_code=503, detail="TELEGRAM_CHAT_ID not configured")
+
+    bot_app = get_bot_app()
+    loop = get_bot_loop()
+    if not bot_app or not loop:
+        raise HTTPException(status_code=503, detail="Telegram bot not running")
+
+    future = asyncio.run_coroutine_threadsafe(
+        bot_app.bot.send_message(
+            chat_id=chat_id,
+            text=request.text,
+            disable_web_page_preview=True,
+        ),
+        loop,
+    )
+    future.result(timeout=10)
+    return {"status": "sent"}
