@@ -323,7 +323,12 @@ async def _process_reel_inner(update, reel_id, url, user_context, chat_id):
         except Exception:
             pass
 
-        await update.message.reply_text(notification, parse_mode="Markdown")
+        try:
+            await update.message.reply_text(notification, parse_mode="Markdown")
+        except Exception:
+            # Markdown parsing failed — send plain text fallback
+            plain = f"{result.plan.title}\n{action_line}\n\n{view_url}"
+            await update.message.reply_text(plain)
         _log_message(chat_id, notification, direction="out")
         logger.info(f"Telegram: sent notification for {reel_id} in {elapsed}s")
 
