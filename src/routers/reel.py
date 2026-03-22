@@ -358,6 +358,7 @@ def process_batch(request: BatchRequest, _: str = Depends(require_api_key)) -> d
 
 class SendMessageRequest(BaseModel):
     text: str = Field(max_length=4000)
+    chat_id: int | None = None  # Falls back to TELEGRAM_CHAT_ID env var
 
 
 @router.post("/send-telegram")
@@ -366,9 +367,9 @@ def send_telegram(request: SendMessageRequest, _: str = Depends(require_api_key)
     from src.services.telegram_bot import get_bot_app, get_bot_loop
     import asyncio
 
-    chat_id = settings.telegram_chat_id
+    chat_id = request.chat_id or settings.telegram_chat_id
     if not chat_id:
-        raise HTTPException(status_code=503, detail="TELEGRAM_CHAT_ID not configured")
+        raise HTTPException(status_code=503, detail="No chat_id provided and TELEGRAM_CHAT_ID not configured")
 
     bot_app = get_bot_app()
     loop = get_bot_loop()
@@ -377,7 +378,7 @@ def send_telegram(request: SendMessageRequest, _: str = Depends(require_api_key)
 
     future = asyncio.run_coroutine_threadsafe(
         bot_app.bot.send_message(
-            chat_id=chat_id,
+            chat_id=int(chat_id),
             text=request.text,
             disable_web_page_preview=True,
         ),
