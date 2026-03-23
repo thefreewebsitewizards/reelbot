@@ -198,6 +198,22 @@ def generate_plan(analysis: AnalysisResult, metadata: ReelMetadata, user_context
 
         tasks = []
         for t in data.get("tasks", []):
+            tool_data = t.get("tool_data") or {}
+            tools = normalize_string_list(t.get("tools") or [])
+
+            # Validate sales_script section_id — swap to knowledge_base if hallucinated
+            if "sales_script" in tools and tool_data.get("section_id"):
+                from src.utils.script_manager import get_section
+                if get_section(tool_data["section_id"]) is None:
+                    logger.warning(f"Hallucinated section_id '{tool_data['section_id']}' — converting to knowledge_base task")
+                    tools = ["knowledge_base"]
+                    tool_data = {
+                        "title": t.get("title", ""),
+                        "content": tool_data.get("new_content") or tool_data.get("note") or t.get("description", ""),
+                        "category": "sales",
+                        "tags": ["script_suggestion", tool_data["section_id"]],
+                    }
+
             tasks.append(PlanTask(
                 title=t.get("title") or "",
                 description=t.get("description") or "",
@@ -205,12 +221,12 @@ def generate_plan(analysis: AnalysisResult, metadata: ReelMetadata, user_context
                 estimated_hours=float(t.get("estimated_hours") or 1.0),
                 deliverables=normalize_string_list(t.get("deliverables") or []),
                 dependencies=normalize_string_list(t.get("dependencies") or []),
-                tools=normalize_string_list(t.get("tools") or []),
+                tools=tools,
                 requires_human=bool(t.get("requires_human", False)),
                 human_reason=t.get("human_reason") or "",
                 level=_parse_level(t.get("level", 1)),
                 change_type=t.get("change_type") or "",
-                tool_data=t.get("tool_data") or {},
+                tool_data=tool_data,
             ))
 
         plan = ImplementationPlan(
