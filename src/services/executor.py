@@ -236,6 +236,9 @@ def execute_plan(reel_id: str, plan_dir_name: str) -> dict:
 
     _notify_execution_complete(reel_id, plan_title, results, len(human_tasks))
 
+    # Auto-feedback: record lessons from execution results
+    _record_execution_lessons(reel_id, results)
+
     all_auto_passed = all(r["status"] == "completed" for r in results)
     all_auto_failed = results and all(r["status"] == "failed" for r in results)
 
@@ -254,6 +257,30 @@ def execute_plan(reel_id: str, plan_dir_name: str) -> dict:
         "human_count": len(human_tasks),
         "results": results,
     }
+
+
+def _record_execution_lessons(reel_id: str, results: list[dict]) -> None:
+    """Extract lessons from execution results and save as auto-feedback."""
+    from src.utils.feedback import save_auto_feedback
+
+    lessons = []
+    for r in results:
+        notes = r.get("notes", "")
+        title = r.get("title", "")
+
+        if "not found -- skipped" in notes:
+            lessons.append(f"BAD: Task '{title}' used an invalid sales_script section_id. Use only valid IDs from the script.")
+        elif "skipped" in notes.lower() and r.get("status") == "failed":
+            lessons.append(f"BAD: Task '{title}' failed — handler skipped all tools. Make sure tool_data has valid, actionable data.")
+        elif "No handler" in notes:
+            lessons.append(f"BAD: Task '{title}' used an unknown tool. Stick to: knowledge_base, sales_script, claude_code, content.")
+        elif r.get("status") == "completed" and "Saved:" in notes:
+            lessons.append(f"GOOD: Task '{title}' executed successfully via knowledge_base.")
+        elif r.get("status") == "completed" and "Updated section" in notes:
+            lessons.append(f"GOOD: Task '{title}' updated sales script successfully.")
+
+    if lessons:
+        save_auto_feedback(reel_id, lessons)
 
 
 def mark_in_progress(reel_id: str) -> None:

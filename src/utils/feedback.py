@@ -79,6 +79,38 @@ def update_feedback_comment(reel_id: str, comment: str) -> bool:
     return True
 
 
+def save_auto_feedback(reel_id: str, lessons: list[str]) -> bool:
+    """Save automatically generated feedback from execution results.
+
+    Called after plan execution to record what worked and what didn't.
+    These lessons get injected into future plan prompts.
+    """
+    if not lessons:
+        return False
+
+    entry = find_plan_by_id(reel_id)
+    if not entry:
+        return False
+
+    plan_dir = settings.plans_dir / entry["plan_dir"]
+    if not plan_dir.exists():
+        return False
+
+    auto_path = plan_dir / "auto_feedback.json"
+    data = {
+        "reel_id": reel_id,
+        "plan_title": entry.get("title", ""),
+        "lessons": lessons,
+        "created_at": datetime.now(timezone.utc).isoformat(),
+    }
+
+    with open(auto_path, "w") as f:
+        json.dump(data, f, indent=2)
+
+    logger.info(f"Auto-feedback saved for {reel_id}: {len(lessons)} lessons")
+    return True
+
+
 def get_recent_feedback(limit: int = 5) -> list[dict]:
     """Return recent feedback entries across all plans, sorted newest first.
 
@@ -88,10 +120,10 @@ def get_recent_feedback(limit: int = 5) -> list[dict]:
     Returns:
         List of feedback dicts with reel_id, plan_title, rating, comment, created_at.
     """
-    feedback_files = list(settings.plans_dir.glob("*/feedback.json"))
     entries = []
 
-    for fp in feedback_files:
+    # Manual feedback
+    for fp in settings.plans_dir.glob("*/feedback.json"):
         try:
             with open(fp) as f:
                 data = json.load(f)
@@ -104,6 +136,24 @@ def get_recent_feedback(limit: int = 5) -> list[dict]:
             })
         except (json.JSONDecodeError, OSError) as exc:
             logger.warning(f"Failed to read feedback file {fp}: {exc}")
+
+    # Auto-feedback from execution results
+    for fp in settings.plans_dir.glob("*/auto_feedback.json"):
+        try:
+            with open(fp) as f:
+                data = json.load(f)
+            # Convert lessons to feedback-like entries
+            for lesson in data.get("lessons", []):
+                rating = "good" if lesson.startswith("GOOD:") else "bad"
+                entries.append({
+                    "reel_id": data.get("reel_id", ""),
+                    "plan_title": data.get("plan_title", ""),
+                    "rating": rating,
+                    "comment": lesson,
+                    "created_at": data.get("created_at", ""),
+                })
+        except (json.JSONDecodeError, OSError):
+            pass
 
     entries.sort(key=lambda e: e["created_at"], reverse=True)
     return entries[:limit]
