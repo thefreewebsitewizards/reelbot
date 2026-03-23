@@ -118,6 +118,7 @@ Level rules:
 - Levels are cumulative — approving L2 also executes L1, approving L3 executes all.
 - Total tasks: 3-4. Lean is better.
 - DO NOT fill L3 with content creation just because you need a task — only include L3 if there's genuine value.
+- TASKS MUST MAP TO BUSINESS APPLICATIONS. Each task should directly implement one of the business_applications from the analysis. Don't invent tasks that have no corresponding business application, and don't leave high-urgency applications without a task.
 
 Rules for tool_data — CRITICAL for automated execution:
 - WITHOUT tool_data, tasks just get logged and nothing happens

@@ -144,7 +144,11 @@ def review_queue():
 
     index = get_index()
     review_plans = [p for p in index.get("plans", []) if p.get("status") == "review"]
-    review_plans.sort(key=lambda p: p.get("created_at", ""), reverse=True)
+    # Sort by relevance (highest first), then newest first as tiebreaker
+    review_plans.sort(
+        key=lambda p: (p.get("relevance_score", 0), p.get("created_at", "")),
+        reverse=True,
+    )
 
     # Load task data for each plan
     plans_with_tasks = []
@@ -197,7 +201,7 @@ def review_queue():
                     "title": t.get("title", ""),
                     "level": t.get("level", 1),
                     "tools": t.get("tools", []),
-                    "estimated_hours": t.get("estimated_hours", 0),
+                    "change_type": t.get("change_type", ""),
                 }
                 for t in tasks
             ],

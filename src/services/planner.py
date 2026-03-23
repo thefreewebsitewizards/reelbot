@@ -179,7 +179,18 @@ def generate_plan(analysis: AnalysisResult, metadata: ReelMetadata, user_context
         for sp in similarity.similar_plans:
             if sp.comparisons:
                 for c in sp.comparisons:
-                    lines.append(f"- {c.area}: current=\"{c.current_content}\", new=\"{c.new_content}\" (verdict: {c.verdict})")
+                    verdict_action = {
+                        "better": "REPLACE the old approach",
+                        "different_angle": "ADD alongside existing",
+                        "same": "SKIP — already covered",
+                        "worse": "IGNORE — existing is better",
+                    }.get(c.verdict, c.verdict)
+                    lines.append(
+                        f"- **{c.area}** [{c.verdict}] → {verdict_action}\n"
+                        f"  Existing: {c.current_content[:150]}\n"
+                        f"  This reel: {c.new_content[:150]}"
+                        + (f"\n  Why: {c.explanation[:150]}" if c.explanation else "")
+                    )
         if lines:
             comparison_context = "\n".join(lines)
 
