@@ -78,6 +78,17 @@
   .btn-view { background: transparent; border: 1px solid #334155; color: #94a3b8; padding: 8px 12px; }
   .btn-view:hover { border-color: #64748b; color: #e2e8f0; }
   .status-msg { color: #94a3b8; font-size: 0.8rem; margin-left: auto; }
+  .notes-input {
+    width: 100%; background: #0f172a; border: 1px solid #334155; border-radius: 4px;
+    color: #e2e8f0; padding: 6px 8px; font-size: 0.8rem; margin-top: 8px;
+    font-family: inherit; display: none;
+  }
+  .notes-input::placeholder { color: #475569; }
+  .notes-toggle {
+    background: none; border: none; color: #475569; font-size: 0.75rem;
+    cursor: pointer; padding: 0; margin-top: 6px;
+  }
+  .notes-toggle:hover { color: #94a3b8; }
   .spinner {
     display: inline-block; width: 12px; height: 12px; border: 2px solid rgba(255,255,255,0.3);
     border-top-color: #fff; border-radius: 50%; animation: spin 0.6s linear infinite;
@@ -142,6 +153,8 @@ function render() {
         '<button class="qb" onclick="selectLevel(' + pi + ',3)">All</button>' +
         '<button class="qb" onclick="selectNone(' + pi + ')">Clear</button>' +
       '</div>' +
+      '<button class="notes-toggle" onclick="toggleNotes(' + pi + ')">+ add notes</button>' +
+      '<input class="notes-input" id="notes-' + pi + '" placeholder="Optional notes (conditions, changes, context...)">' +
       '<div class="action-row">' +
         '<button class="btn btn-approve" id="approve-' + pi + '" onclick="approve(' + pi + ')">Approve</button>' +
         '<button class="btn btn-skip" onclick="skip(' + pi + ')">Skip</button>' +
@@ -174,10 +187,17 @@ function selectNone(pi) {
   render();
 }
 
+function toggleNotes(pi) {
+  var el = document.getElementById('notes-' + pi);
+  el.style.display = el.style.display === 'none' ? '' : 'none';
+  if (el.style.display !== 'none') el.focus();
+}
+
 async function approve(pi) {
   var p = plans[pi];
   var sel = p._selected ? Array.from(p._selected) : [];
   if (sel.length === 0) { selectLevel(pi, 2); sel = Array.from(plans[pi]._selected); }
+  var notes = (document.getElementById('notes-' + pi) || {}).value || '';
 
   var btn = document.getElementById('approve-' + pi);
   btn.disabled = true;
@@ -187,7 +207,7 @@ async function approve(pi) {
     var res = await fetch('/plans/' + p.reel_id + '/approve', {
       method: 'POST',
       headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify({ selected_tasks: sel, notes: '' }),
+      body: JSON.stringify({ selected_tasks: sel, notes: notes }),
     });
     if (res.ok) {
       p._resolved = true;
