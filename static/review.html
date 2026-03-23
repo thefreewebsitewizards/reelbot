@@ -48,11 +48,20 @@
   .plan-meta a { color: #64748b; }
   .plan-meta a:hover { color: #94a3b8; }
   .video-embed {
-    display: none; margin: 8px 0; border-radius: 8px; overflow: hidden;
-    max-width: 400px;
+    margin: 8px 0; border-radius: 8px; overflow: hidden;
+    max-width: 350px;
   }
-  .video-embed.open { display: block; }
-  .video-embed iframe { width: 100%; height: 480px; border: none; border-radius: 8px; }
+  .video-embed iframe { width: 100%; height: 450px; border: none; border-radius: 8px; }
+
+  .tabs { display: flex; gap: 0; margin-bottom: 16px; border-bottom: 1px solid #334155; }
+  .tab {
+    padding: 8px 20px; cursor: pointer; font-size: 0.9rem; font-weight: 600;
+    color: #64748b; border-bottom: 2px solid transparent; transition: all 0.15s;
+    background: none; border-top: none; border-left: none; border-right: none;
+  }
+  .tab:hover { color: #e2e8f0; }
+  .tab.active { color: #f8fafc; border-bottom-color: #3b82f6; }
+  .tab-badge { font-size: 0.75rem; font-weight: 400; margin-left: 6px; color: #94a3b8; }
 
   .task-row { display: flex; align-items: flex-start; gap: 8px; margin-bottom: 4px; }
   .task-check {
@@ -139,33 +148,38 @@
 
 <div class="header">
   <h1>Review Queue</h1>
-  <span class="counter" id="counter"></span>
   <a href="/" class="back-btn">Dashboard</a>
+</div>
+
+<div class="tabs">
+  <button class="tab active" id="tab-review" onclick="switchTab('review')">Review<span class="tab-badge" id="review-count"></span></button>
+  <button class="tab" id="tab-failed" onclick="switchTab('failed')">Failed<span class="tab-badge" id="failed-count"></span></button>
 </div>
 
 <div id="queue"></div>
 <div class="empty-state" id="empty" style="display:none;">No plans to review. Send some reels!</div>
 
-<div id="failed-section" style="display:none;">
-  <div style="margin-top:24px;padding-top:16px;border-top:1px solid #334155;">
-    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
-      <h2 style="font-size:1.1rem;color:#ef4444;">Failed</h2>
-      <span class="counter" id="failed-counter" style="color:#ef4444;"></span>
-    </div>
-  </div>
-  <div id="failed-queue"></div>
-</div>
+<div id="failed-queue" style="display:none;"></div>
+<div class="empty-state" id="failed-empty" style="display:none;">No failed plans.</div>
 
 <script>
 var plans = {{plans_json}};
 var failedPlans = {{failed_json}};
+var activeTab = 'review';
+
+function switchTab(tab) {
+  activeTab = tab;
+  document.getElementById('tab-review').className = 'tab' + (tab === 'review' ? ' active' : '');
+  document.getElementById('tab-failed').className = 'tab' + (tab === 'failed' ? ' active' : '');
+  document.getElementById('queue').style.display = tab === 'review' ? '' : 'none';
+  document.getElementById('empty').style.display = tab === 'review' && plans.length === 0 ? '' : 'none';
+  document.getElementById('failed-queue').style.display = tab === 'failed' ? '' : 'none';
+  document.getElementById('failed-empty').style.display = tab === 'failed' && failedPlans.length === 0 ? '' : 'none';
+}
 
 function renderFailed() {
-  var section = document.getElementById('failed-section');
+  document.getElementById('failed-count').textContent = failedPlans.length || '';
   var fq = document.getElementById('failed-queue');
-  if (!failedPlans.length) { section.style.display = 'none'; return; }
-  section.style.display = '';
-  document.getElementById('failed-counter').textContent = failedPlans.length + ' failed';
 
   fq.innerHTML = failedPlans.map(function(p, fi) {
     var err = p.error_detail || 'Unknown error';
@@ -189,8 +203,8 @@ function renderFailed() {
 function render() {
   var q = document.getElementById('queue');
   var pending = plans.filter(function(p) { return !p._resolved; });
-  document.getElementById('counter').textContent = pending.length + ' to review';
-  document.getElementById('empty').style.display = plans.length === 0 ? '' : 'none';
+  document.getElementById('review-count').textContent = pending.length || '';
+  document.getElementById('empty').style.display = (activeTab === 'review' && plans.length === 0) ? '' : 'none';
 
   q.innerHTML = plans.map(function(p, pi) {
     var cls = 'plan-card' + (p._resolved ? ' resolved' : '');
@@ -222,13 +236,11 @@ function render() {
     if (p.creator) metaParts.push(esc(p.creator));
     if (p.category) metaParts.push(esc(p.category));
     metaParts.push((p.relevance_score * 100).toFixed(0) + '%');
-    if (p.source_url) metaParts.push('<a href="#" onclick="toggleVideo(' + pi + ');return false;">watch video</a>');
 
-    if (!p._videoOpen) p._videoOpen = false;
     var embedUrl = p.source_url ? p.source_url.replace(/\/$/, '') + '/embed/' : '';
     var videoHtml = embedUrl ?
-      '<div class="video-embed' + (p._videoOpen ? ' open' : '') + '" id="video-' + pi + '">' +
-        (p._videoOpen ? '<iframe src="' + esc(embedUrl) + '" allowfullscreen></iframe>' : '') +
+      '<div class="video-embed">' +
+        '<iframe src="' + esc(embedUrl) + '" loading="lazy" allowfullscreen></iframe>' +
       '</div>' : '';
 
     return '<div class="' + cls + '" id="plan-' + pi + '">' +
@@ -280,11 +292,6 @@ function selectLevel(pi, maxLevel) {
 
 function selectNone(pi) {
   plans[pi]._selected = new Set();
-  render();
-}
-
-function toggleVideo(pi) {
-  plans[pi]._videoOpen = !plans[pi]._videoOpen;
   render();
 }
 
@@ -401,6 +408,7 @@ function esc(s) {
 
 render();
 renderFailed();
+switchTab('review');
 </script>
 </body>
 </html>
