@@ -91,6 +91,11 @@ def _execute_auto_task(task: dict, plan_dir: str, task_index: int) -> dict:
             handler_results.append(f"[{tool}] No handler -- logged only")
 
     result["notes"] = "; ".join(handler_results) if handler_results else "No tools to execute"
+
+    # Mark as failed if all handlers skipped (e.g. invalid section_id)
+    if handler_results and all("skipped" in r.lower() for r in handler_results):
+        result["status"] = "failed"
+
     return result
 
 
