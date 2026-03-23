@@ -20,6 +20,9 @@ COPY shared-context/ shared-context/
 # Install the project and all dependencies
 RUN pip install --no-cache-dir .
 
+# Pre-download Whisper model into the image so it doesn't re-download every deploy
+RUN python3 -c "from faster_whisper import WhisperModel; WhisperModel('small', device='cpu', compute_type='int8')"
+
 # Create dirs for runtime data
 RUN mkdir -p plans tmp
 

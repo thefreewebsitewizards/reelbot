@@ -13,6 +13,17 @@ from src.services.llm import chat, ChatResult, get_model_for_step
 from src.utils.json_extract import extract_json, normalize_string_list
 
 
+def _parse_level(value) -> int:
+    """Parse level from LLM output — handles 1, "1", "l1", "L2", etc."""
+    if isinstance(value, int):
+        return value
+    s = str(value).strip().lower().lstrip("l")
+    try:
+        return int(s)
+    except (ValueError, TypeError):
+        return 1
+
+
 def check_plan_similarity(analysis: AnalysisResult) -> tuple[SimilarityResult, ChatResult | None]:
     """Check if new analysis overlaps with existing plans."""
     existing_plans = get_past_plan_summaries(limit=15)
@@ -197,7 +208,7 @@ def generate_plan(analysis: AnalysisResult, metadata: ReelMetadata, user_context
                 tools=normalize_string_list(t.get("tools") or []),
                 requires_human=bool(t.get("requires_human", False)),
                 human_reason=t.get("human_reason") or "",
-                level=int(t.get("level", 1)),
+                level=_parse_level(t.get("level", 1)),
                 change_type=t.get("change_type") or "",
                 tool_data=t.get("tool_data") or {},
             ))
