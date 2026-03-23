@@ -12,7 +12,7 @@
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
     background: #0f172a; color: #e2e8f0;
     line-height: 1.6; padding: 16px;
-    max-width: 700px; margin: 0 auto;
+    max-width: 1000px; margin: 0 auto;
   }
   a { color: #60a5fa; text-decoration: none; }
   a:hover { text-decoration: underline; }
@@ -31,7 +31,9 @@
     background: #1e293b; border-radius: 8px; padding: 16px;
     margin-bottom: 12px; border: 1px solid #334155;
     transition: opacity 0.3s;
+    display: flex; gap: 16px;
   }
+  .plan-content { flex: 1; min-width: 0; }
   .plan-card.resolved { animation: fadeOut 0.4s ease forwards; }
   @keyframes fadeOut { to { opacity: 0; height: 0; padding: 0; margin: 0; border: 0; overflow: hidden; } }
   .plan-title { font-weight: 700; color: #f8fafc; font-size: 1rem; margin-bottom: 4px; }
@@ -48,8 +50,8 @@
   .plan-meta a { color: #64748b; }
   .plan-meta a:hover { color: #94a3b8; }
   .video-embed {
-    margin: 8px 0; border-radius: 8px; overflow: hidden;
-    max-width: 350px;
+    border-radius: 8px; overflow: hidden;
+    width: 300px; flex-shrink: 0;
   }
   .video-embed iframe { width: 100%; height: 450px; border: none; border-radius: 8px; }
 
@@ -136,9 +138,10 @@
 
   .empty-state { color: #64748b; text-align: center; padding: 60px 20px; }
 
-  @media (max-width: 600px) {
+  @media (max-width: 768px) {
     body { padding: 10px; }
-    .plan-card { padding: 12px; }
+    .plan-card { flex-direction: column; padding: 12px; }
+    .video-embed { width: 100%; }
     .action-row { flex-wrap: wrap; }
     .btn { flex: 1; text-align: center; }
   }
@@ -244,31 +247,33 @@ function render() {
       '</div>' : '';
 
     return '<div class="' + cls + '" id="plan-' + pi + '">' +
-      '<div class="plan-title">' + esc(p.title) + '</div>' +
-      '<div class="plan-meta">' + metaParts.join(' &middot; ') + '</div>' +
+      '<div class="plan-content">' +
+        '<div class="plan-title">' + esc(p.title) + '</div>' +
+        '<div class="plan-meta">' + metaParts.join(' &middot; ') + '</div>' +
+        (p.summary ? '<div class="plan-summary">' + esc(p.summary) + '</div>' : '') +
+        (p.recommended_action ? '<div class="plan-rec"><span class="plan-rec-label">Why it matters </span>' + esc(p.recommended_action) + '</div>' : '') +
+        taskHtml +
+        '<div class="quick-btns">' +
+          '<button class="qb" onclick="selectLevel(' + pi + ',1)">L1</button>' +
+          '<button class="qb" onclick="selectLevel(' + pi + ',2)">L1+L2</button>' +
+          '<button class="qb" onclick="selectLevel(' + pi + ',3)">All</button>' +
+          '<button class="qb" onclick="selectNone(' + pi + ')">Clear</button>' +
+        '</div>' +
+        '<button class="notes-toggle" onclick="toggleNotes(' + pi + ')">+ add notes</button>' +
+        '<input class="notes-input" id="notes-' + pi + '"' +
+          ' value="' + esc(p._notes || '') + '"' +
+          ' style="display:' + (p._notesOpen ? 'block' : 'none') + '"' +
+          ' oninput="plans[' + pi + ']._notes=this.value"' +
+          ' placeholder="Optional notes (conditions, changes, context...)">' +
+        '<div class="action-row">' +
+          '<button class="btn btn-approve" id="approve-' + pi + '" onclick="approve(' + pi + ')">Approve</button>' +
+          '<button class="btn btn-redo" id="redo-' + pi + '" onclick="redo(' + pi + ')">Redo</button>' +
+          '<button class="btn btn-skip" onclick="skip(' + pi + ')">Skip</button>' +
+          '<a class="btn btn-view" href="/plans/' + p.reel_id + '/view" target="_blank">Full plan</a>' +
+          statusHtml +
+        '</div>' +
+      '</div>' +
       videoHtml +
-      (p.summary ? '<div class="plan-summary">' + esc(p.summary) + '</div>' : '') +
-      (p.recommended_action ? '<div class="plan-rec"><span class="plan-rec-label">Why it matters </span>' + esc(p.recommended_action) + '</div>' : '') +
-      taskHtml +
-      '<div class="quick-btns">' +
-        '<button class="qb" onclick="selectLevel(' + pi + ',1)">L1</button>' +
-        '<button class="qb" onclick="selectLevel(' + pi + ',2)">L1+L2</button>' +
-        '<button class="qb" onclick="selectLevel(' + pi + ',3)">All</button>' +
-        '<button class="qb" onclick="selectNone(' + pi + ')">Clear</button>' +
-      '</div>' +
-      '<button class="notes-toggle" onclick="toggleNotes(' + pi + ')">+ add notes</button>' +
-      '<input class="notes-input" id="notes-' + pi + '"' +
-        ' value="' + esc(p._notes || '') + '"' +
-        ' style="display:' + (p._notesOpen ? 'block' : 'none') + '"' +
-        ' oninput="plans[' + pi + ']._notes=this.value"' +
-        ' placeholder="Optional notes (conditions, changes, context...)">' +
-      '<div class="action-row">' +
-        '<button class="btn btn-approve" id="approve-' + pi + '" onclick="approve(' + pi + ')">Approve</button>' +
-        '<button class="btn btn-redo" id="redo-' + pi + '" onclick="redo(' + pi + ')">Redo</button>' +
-        '<button class="btn btn-skip" onclick="skip(' + pi + ')">Skip</button>' +
-        '<a class="btn btn-view" href="/plans/' + p.reel_id + '/view" target="_blank">Full plan</a>' +
-        statusHtml +
-      '</div>' +
     '</div>';
   }).join('');
 }
