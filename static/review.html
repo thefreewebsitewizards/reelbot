@@ -159,15 +159,16 @@ function render() {
       var ct = t.change_type || '';
       var ctHtml = ct && ctLabels[ct] ? ' <span class="ct-badge ct-' + ct + '">' + ctLabels[ct] + '</span>' : '';
       var desc = t.description || '';
-      var descId = 'desc-' + pi + '-' + ti;
+      if (!p._expanded) p._expanded = new Set();
+      var isExpanded = p._expanded.has(ti);
       return '<div class="task-row">' +
         '<div class="task-check' + checked + '" onclick="toggleTask(' + pi + ',' + ti + ')">' +
         '<span class="task-check-mark">&#10003;</span></div>' +
         '<span class="task-level tl-' + lvl + '">' + (levelNames[lvl] || 'L'+lvl) + '</span>' +
         ctHtml +
-        '<span class="task-text" onclick="toggleDesc(\'' + descId + '\')">' + esc(t.title) + (tools ? ' <span style="color:#64748b">(' + tools + ')</span>' : '') + '</span>' +
+        '<span class="task-text" onclick="toggleDesc(' + pi + ',' + ti + ')">' + esc(t.title) + (tools ? ' <span style="color:#64748b">(' + tools + ')</span>' : '') + '</span>' +
         '</div>' +
-        (desc ? '<div class="task-desc" id="' + descId + '">' + esc(desc) + '</div>' : '');
+        (desc ? '<div class="task-desc' + (isExpanded ? ' open' : '') + '">' + esc(desc) + '</div>' : '');
     }).join('');
 
     var statusHtml = p._status ? '<span class="status-msg">' + p._status + '</span>' : '';
@@ -228,15 +229,20 @@ function selectNone(pi) {
   render();
 }
 
-function toggleDesc(id) {
-  var el = document.getElementById(id);
-  if (el) el.classList.toggle('open');
+function toggleDesc(pi, ti) {
+  if (!plans[pi]._expanded) plans[pi]._expanded = new Set();
+  if (plans[pi]._expanded.has(ti)) plans[pi]._expanded.delete(ti);
+  else plans[pi]._expanded.add(ti);
+  render();
 }
 
 function toggleNotes(pi) {
   plans[pi]._notesOpen = !plans[pi]._notesOpen;
   render();
-  if (plans[pi]._notesOpen) document.getElementById('notes-' + pi).focus();
+  if (plans[pi]._notesOpen) {
+    var el = document.getElementById('notes-' + pi);
+    if (el) { el.focus(); el.selectionStart = el.value.length; }
+  }
 }
 
 async function approve(pi) {
