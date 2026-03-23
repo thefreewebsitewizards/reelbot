@@ -86,7 +86,7 @@ Return JSON:
 {{
   "title": "Concise plan title (max 8 words)",
   "summary": "1 sentence — what this plan achieves",
-  "recommended_action": "1 sentence — the single most impactful thing Dylan should do based on this reel. Be specific and direct, e.g. 'Add objection handler X to AIAS sales flow' not 'Consider implementing improvements'",
+  "recommended_action": "1 sentence — why this reel matters and what changes if we act on it. NOT a task description. E.g. 'This closing technique could lift our show-to-close rate — we're losing deals at exactly this stage' not 'Add objection handler to AIAS'",
   "content_angle": "DDB content idea if relevant, or empty string",
   "level_summaries": {{
     "1": "What level 1 does (1 sentence)",

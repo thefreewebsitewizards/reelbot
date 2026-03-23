@@ -161,7 +161,7 @@ function render() {
       '<div class="plan-title">' + esc(p.title) + '</div>' +
       '<div class="plan-meta">' + metaParts.join(' &middot; ') + '</div>' +
       (p.summary ? '<div class="plan-summary">' + esc(p.summary) + '</div>' : '') +
-      (p.recommended_action ? '<div class="plan-rec"><span class="plan-rec-label">Recommended </span>' + esc(p.recommended_action) + '</div>' : '') +
+      (p.recommended_action ? '<div class="plan-rec"><span class="plan-rec-label">Why it matters </span>' + esc(p.recommended_action) + '</div>' : '') +
       taskHtml +
       '<div class="quick-btns">' +
         '<button class="qb" onclick="selectLevel(' + pi + ',1)">L1</button>' +
