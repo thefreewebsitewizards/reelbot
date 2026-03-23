@@ -136,6 +136,88 @@ def dashboard():
     return HTMLResponse(html)
 
 
+def _load_plan_card(p: dict) -> dict:
+    """Load a plan index entry into a card dict for the review UI."""
+    plan_json = settings.plans_dir / p["plan_dir"] / "plan.json"
+    tasks = []
+    rec_action = ""
+    category = ""
+    relevance = 0.0
+    theme = ""
+    creator = ""
+    summary = ""
+    source_url = ""
+    error_detail = ""
+    if plan_json.exists():
+        try:
+            pd = json.loads(plan_json.read_text())
+            tasks = pd.get("tasks", [])
+            rec_action = pd.get("recommended_action", "")
+            summary = pd.get("summary", "")
+        except (json.JSONDecodeError, OSError):
+            pass
+    # Read analysis for category/relevance/theme/summary
+    analysis_path = settings.plans_dir / p["plan_dir"] / "analysis.json"
+    if analysis_path.exists():
+        try:
+            ad = json.loads(analysis_path.read_text())
+            category = ad.get("category", "")
+            relevance = ad.get("relevance_score", 0.0)
+            theme = ad.get("theme", "")
+            if not summary:
+                summary = ad.get("summary", "")
+        except (json.JSONDecodeError, OSError):
+            pass
+    # Read metadata for creator + source URL
+    meta_path = settings.plans_dir / p["plan_dir"] / "metadata.json"
+    if meta_path.exists():
+        try:
+            md = json.loads(meta_path.read_text())
+            creator = md.get("creator", "")
+            source_url = md.get("source_url", "")
+        except (json.JSONDecodeError, OSError):
+            pass
+    # Read execution log for failure details
+    exec_log = settings.plans_dir / p["plan_dir"] / "execution_log.json"
+    if exec_log.exists():
+        try:
+            el = json.loads(exec_log.read_text())
+            failed = [r for r in el.get("auto_results", []) if r.get("status") == "failed"]
+            if failed:
+                error_detail = "; ".join(
+                    f"{r.get('title', '?')}: {r.get('error', r.get('notes', '?'))[:100]}"
+                    for r in failed
+                )
+        except (json.JSONDecodeError, OSError):
+            pass
+
+    error_detail = error_detail or p.get("error_detail", "")
+
+    return {
+        "reel_id": p.get("reel_id", ""),
+        "title": p.get("title", "Untitled"),
+        "status": p.get("status", ""),
+        "recommended_action": rec_action,
+        "summary": summary,
+        "source_url": source_url or p.get("source_url", ""),
+        "theme": theme,
+        "creator": creator,
+        "category": category,
+        "relevance_score": relevance,
+        "error_detail": error_detail,
+        "tasks": [
+            {
+                "title": t.get("title", ""),
+                "description": t.get("description", ""),
+                "level": t.get("level", 1),
+                "tools": t.get("tools", []),
+                "change_type": t.get("change_type", ""),
+            }
+            for t in tasks
+        ],
+    }
+
+
 @router.get("/review", response_class=HTMLResponse)
 def review_queue():
     """Serve the review queue page — rapid approve/skip for plans in review."""
@@ -143,72 +225,21 @@ def review_queue():
     template = template_path.read_text()
 
     index = get_index()
+
     review_plans = [p for p in index.get("plans", []) if p.get("status") == "review"]
-    # Sort by relevance (highest first), then newest first as tiebreaker
     review_plans.sort(
         key=lambda p: (p.get("relevance_score", 0), p.get("created_at", "")),
         reverse=True,
     )
 
-    # Load task data for each plan
-    plans_with_tasks = []
-    for p in review_plans:
-        plan_json = settings.plans_dir / p["plan_dir"] / "plan.json"
-        tasks = []
-        rec_action = ""
-        category = ""
-        relevance = 0.0
-        theme = ""
-        creator = ""
-        summary = ""
-        source_url = ""
-        if plan_json.exists():
-            try:
-                pd = json.loads(plan_json.read_text())
-                tasks = pd.get("tasks", [])
-                rec_action = pd.get("recommended_action", "")
-                summary = pd.get("summary", "")
-                # Read analysis for category/relevance/theme/summary
-                analysis_path = settings.plans_dir / p["plan_dir"] / "analysis.json"
-                if analysis_path.exists():
-                    ad = json.loads(analysis_path.read_text())
-                    category = ad.get("category", "")
-                    relevance = ad.get("relevance_score", 0.0)
-                    theme = ad.get("theme", "")
-                    if not summary:
-                        summary = ad.get("summary", "")
-                # Read metadata for creator + source URL
-                meta_path = settings.plans_dir / p["plan_dir"] / "metadata.json"
-                if meta_path.exists():
-                    md = json.loads(meta_path.read_text())
-                    creator = md.get("creator", "")
-                    source_url = md.get("source_url", "")
-            except (json.JSONDecodeError, OSError):
-                pass
+    failed_plans = [p for p in index.get("plans", []) if p.get("status") == "failed"]
+    failed_plans.sort(key=lambda p: p.get("created_at", ""), reverse=True)
 
-        plans_with_tasks.append({
-            "reel_id": p.get("reel_id", ""),
-            "title": p.get("title", "Untitled"),
-            "recommended_action": rec_action,
-            "summary": summary,
-            "source_url": source_url,
-            "theme": theme,
-            "creator": creator,
-            "category": category,
-            "relevance_score": relevance,
-            "tasks": [
-                {
-                    "title": t.get("title", ""),
-                    "description": t.get("description", ""),
-                    "level": t.get("level", 1),
-                    "tools": t.get("tools", []),
-                    "change_type": t.get("change_type", ""),
-                }
-                for t in tasks
-            ],
-        })
+    review_cards = [_load_plan_card(p) for p in review_plans]
+    failed_cards = [_load_plan_card(p) for p in failed_plans]
 
-    html = template.replace("{{plans_json}}", json.dumps(plans_with_tasks))
+    html = template.replace("{{plans_json}}", json.dumps(review_cards))
+    html = html.replace("{{failed_json}}", json.dumps(failed_cards))
     return HTMLResponse(html)
 
 

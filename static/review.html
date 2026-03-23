@@ -138,8 +138,45 @@
 <div id="queue"></div>
 <div class="empty-state" id="empty" style="display:none;">No plans to review. Send some reels!</div>
 
+<div id="failed-section" style="display:none;">
+  <div style="margin-top:24px;padding-top:16px;border-top:1px solid #334155;">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
+      <h2 style="font-size:1.1rem;color:#ef4444;">Failed</h2>
+      <span class="counter" id="failed-counter" style="color:#ef4444;"></span>
+    </div>
+  </div>
+  <div id="failed-queue"></div>
+</div>
+
 <script>
 var plans = {{plans_json}};
+var failedPlans = {{failed_json}};
+
+function renderFailed() {
+  var section = document.getElementById('failed-section');
+  var fq = document.getElementById('failed-queue');
+  if (!failedPlans.length) { section.style.display = 'none'; return; }
+  section.style.display = '';
+  document.getElementById('failed-counter').textContent = failedPlans.length + ' failed';
+
+  fq.innerHTML = failedPlans.map(function(p, fi) {
+    var err = p.error_detail || 'Unknown error';
+    var metaParts = [];
+    if (p.creator) metaParts.push(esc(p.creator));
+    if (p.category) metaParts.push(esc(p.category));
+    if (p.source_url) metaParts.push('<a href="' + esc(p.source_url) + '" target="_blank">watch video</a>');
+
+    return '<div class="plan-card" style="border-color:#7f1d1d;">' +
+      '<div class="plan-title">' + esc(p.title) + '</div>' +
+      '<div class="plan-meta">' + metaParts.join(' &middot; ') + '</div>' +
+      (p.summary ? '<div class="plan-summary">' + esc(p.summary) + '</div>' : '') +
+      '<div style="color:#fca5a5;font-size:0.8rem;margin:6px 0;padding:6px 10px;background:#1c1010;border-radius:4px;border-left:2px solid #ef4444;">' + esc(err) + '</div>' +
+      '<div class="action-row">' +
+        '<a class="btn btn-view" href="/plans/' + p.reel_id + '/view" target="_blank">View details</a>' +
+      '</div>' +
+    '</div>';
+  }).join('');
+}
 
 function render() {
   var q = document.getElementById('queue');
@@ -298,6 +335,7 @@ function esc(s) {
 }
 
 render();
+renderFailed();
 </script>
 </body>
 </html>
