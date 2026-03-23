@@ -227,10 +227,7 @@ def review_queue():
     index = get_index()
 
     review_plans = [p for p in index.get("plans", []) if p.get("status") == "review"]
-    review_plans.sort(
-        key=lambda p: (p.get("relevance_score", 0), p.get("created_at", "")),
-        reverse=True,
-    )
+    review_plans.sort(key=lambda p: p.get("created_at", ""), reverse=True)
 
     failed_plans = [p for p in index.get("plans", []) if p.get("status") == "failed"]
     failed_plans.sort(key=lambda p: p.get("created_at", ""), reverse=True)
