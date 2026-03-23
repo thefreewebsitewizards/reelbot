@@ -317,11 +317,16 @@ async function approve(pi) {
 
 async function skip(pi) {
   var p = plans[pi];
+  var reason = p._notes || '';
   try {
-    var res = await fetch('/plans/' + p.reel_id + '/skip', { method: 'POST' });
+    var res = await fetch('/plans/' + p.reel_id + '/skip', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({ reason: reason }),
+    });
     if (res.ok) {
       p._resolved = true;
-      p._status = 'Skipped';
+      p._status = reason ? 'Skipped: ' + reason.substring(0, 40) : 'Skipped';
     }
   } catch(e) {}
   render();

@@ -162,6 +162,18 @@ def approve_plan(reel_id: str, body: ApproveRequest):
 
     _audit_log("approve", reel_id, {"selected_tasks": body.selected_tasks, "notes": body.notes})
 
+    # Save approval as positive feedback for learning
+    from src.utils.feedback import save_feedback
+    selected = len(body.selected_tasks)
+    total = task_count
+    comment = f"Approved {selected}/{total} tasks"
+    if body.notes:
+        comment += f". Notes: {body.notes}"
+    if selected < total:
+        save_feedback(reel_id, "partial", comment)
+    else:
+        save_feedback(reel_id, "good", comment)
+
     # Send Telegram notification (non-blocking)
     _notify_plan_approved(reel_id, plan_data, body.selected_tasks)
 
@@ -226,16 +238,28 @@ def _notify_plan_approved(reel_id: str, plan_data: dict, selected_tasks: list[in
         logger.error(f"Plan approval notification failed: {e}")
 
 
+class SkipRequest(BaseModel):
+    reason: str = ""
+
+
 @router.post("/{reel_id}/skip")
-def skip_plan(reel_id: str):
-    """Skip/reject a plan. No API key required (web UI use)."""
+def skip_plan(reel_id: str, body: SkipRequest | None = None):
+    """Skip/reject a plan. Saves as negative feedback for learning."""
     _validate_reel_id(reel_id)
     entry = find_plan_by_id(reel_id)
     if not entry:
         raise HTTPException(status_code=404, detail=f"Plan not found: {reel_id}")
 
     update_plan_status(reel_id, PlanStatus.SKIPPED)
-    _audit_log("skip", reel_id, {})
+
+    reason = body.reason if body else ""
+    _audit_log("skip", reel_id, {"reason": reason})
+
+    # Save skip as negative feedback so future prompts learn
+    from src.utils.feedback import save_feedback
+    comment = reason if reason else "Plan skipped — not worth implementing"
+    save_feedback(reel_id, "bad", comment)
+
     return {"reel_id": reel_id, "status": "skipped"}
 
 
