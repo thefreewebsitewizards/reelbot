@@ -251,6 +251,103 @@ def skip_plan(reel_id: str, body: SkipRequest | None = None):
     return {"reel_id": reel_id, "status": "skipped"}
 
 
+class RedoRequest(BaseModel):
+    notes: str = Field(default="", max_length=2000)
+
+
+@router.post("/{reel_id}/redo")
+def redo_plan(reel_id: str, body: RedoRequest):
+    """Regenerate the plan from existing analysis with user notes as context.
+
+    Skips download/transcribe/analyze — just re-runs plan generation.
+    """
+    import threading
+    from src.models import AnalysisResult, ReelMetadata, SimilarityResult
+    from src.services.planner import generate_plan
+    from src.utils.plan_writer import write_plan
+    from src.models import PipelineResult, TranscriptResult, CostBreakdown
+
+    _validate_reel_id(reel_id)
+    entry = find_plan_by_id(reel_id)
+    if not entry:
+        raise HTTPException(status_code=404, detail=f"Plan not found: {reel_id}")
+
+    plan_dir = settings.plans_dir / entry["plan_dir"]
+
+    # Load existing analysis
+    analysis_path = plan_dir / "analysis.json"
+    if not analysis_path.exists():
+        raise HTTPException(status_code=400, detail="No analysis.json — cannot redo without analysis")
+
+    meta_path = plan_dir / "metadata.json"
+    if not meta_path.exists():
+        raise HTTPException(status_code=400, detail="No metadata.json")
+
+    analysis = AnalysisResult(**json.loads(analysis_path.read_text()))
+    meta_raw = json.loads(meta_path.read_text())
+    metadata = ReelMetadata(
+        url=meta_raw.get("source_url", ""),
+        shortcode=meta_raw.get("shortcode", reel_id),
+        creator=meta_raw.get("creator", ""),
+        caption=meta_raw.get("caption", ""),
+        duration=meta_raw.get("duration", 0.0),
+        content_type=meta_raw.get("content_type", "reel"),
+    )
+
+    # Load similarity if exists
+    similarity = None
+    sim_path = plan_dir / "similarity.json"
+    if sim_path.exists():
+        try:
+            similarity = SimilarityResult(**json.loads(sim_path.read_text()))
+        except Exception:
+            pass
+
+    _audit_log("redo", reel_id, {"notes": body.notes[:200]})
+
+    # Run plan generation in background
+    def _regen():
+        try:
+            plan, plan_cr = generate_plan(
+                analysis, metadata,
+                user_context=body.notes,
+                similarity=similarity,
+            )
+            costs = CostBreakdown()
+            costs.add("plan", plan_cr.model, plan_cr.prompt_tokens,
+                       plan_cr.completion_tokens, plan_cr.cost_usd, plan_cr.generation_id)
+
+            transcript_path = plan_dir / "transcript.txt"
+            transcript_text = transcript_path.read_text() if transcript_path.exists() else ""
+
+            result = PipelineResult(
+                reel_id=reel_id,
+                status=PlanStatus.REVIEW,
+                metadata=metadata,
+                transcript=TranscriptResult(text=transcript_text, language="en"),
+                analysis=analysis,
+                plan=plan,
+                similarity=similarity,
+                cost_breakdown=costs,
+            )
+
+            # Remove old index entry before writing new one
+            index = get_index()
+            index["plans"] = [e for e in index["plans"] if e["reel_id"] != reel_id]
+            save_index(index)
+
+            write_plan(result)
+            audit_logger.info(f"Plan regenerated for {reel_id} with notes: {body.notes[:100]}")
+        except Exception as e:
+            audit_logger.error(f"Redo failed for {reel_id}: {e}")
+            update_plan_status(reel_id, PlanStatus.FAILED)
+
+    thread = threading.Thread(target=_regen, daemon=True, name=f"redo-{reel_id}")
+    thread.start()
+
+    return {"reel_id": reel_id, "status": "regenerating"}
+
+
 @router.post("/{reel_id}/feedback")
 def submit_feedback(reel_id: str, body: FeedbackRequest):
     """Save feedback for a plan."""

@@ -96,6 +96,7 @@
   .btn:disabled { opacity: 0.4; cursor: not-allowed; transform: none; }
   .btn-approve { background: #22c55e; }
   .btn-skip { background: #64748b; }
+  .btn-redo { background: #f59e0b; }
   .btn-view { background: transparent; border: 1px solid #334155; color: #94a3b8; padding: 8px 12px; }
   .btn-view:hover { border-color: #64748b; color: #e2e8f0; }
   .status-msg { color: #94a3b8; font-size: 0.8rem; margin-left: auto; }
@@ -236,6 +237,7 @@ function render() {
         ' placeholder="Optional notes (conditions, changes, context...)">' +
       '<div class="action-row">' +
         '<button class="btn btn-approve" id="approve-' + pi + '" onclick="approve(' + pi + ')">Approve</button>' +
+        '<button class="btn btn-redo" id="redo-' + pi + '" onclick="redo(' + pi + ')">Redo</button>' +
         '<button class="btn btn-skip" onclick="skip(' + pi + ')">Skip</button>' +
         '<a class="btn btn-view" href="/plans/' + p.reel_id + '/view" target="_blank">Full plan</a>' +
         statusHtml +
@@ -311,6 +313,44 @@ async function approve(pi) {
     p._status = 'Error: ' + e.message;
     btn.disabled = false;
     btn.textContent = 'Approve';
+  }
+  render();
+}
+
+async function redo(pi) {
+  var p = plans[pi];
+  var notes = p._notes || '';
+  if (!notes) {
+    plans[pi]._notesOpen = true;
+    render();
+    var el = document.getElementById('notes-' + pi);
+    if (el) { el.focus(); el.placeholder = 'Add notes for what to change, then click Redo again'; }
+    return;
+  }
+
+  var btn = document.getElementById('redo-' + pi);
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner"></span>Redoing...';
+
+  try {
+    var res = await fetch('/plans/' + p.reel_id + '/redo', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({ notes: notes }),
+    });
+    if (res.ok) {
+      p._resolved = true;
+      p._status = 'Regenerating with notes...';
+    } else {
+      var err = await res.json();
+      p._status = 'Error: ' + (err.detail || res.statusText);
+      btn.disabled = false;
+      btn.textContent = 'Redo';
+    }
+  } catch(e) {
+    p._status = 'Error: ' + e.message;
+    btn.disabled = false;
+    btn.textContent = 'Redo';
   }
   render();
 }
