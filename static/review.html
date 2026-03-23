@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ReelBot — Review Queue</title>
+<meta name="description" content="ReelBot review queue — rapidly approve or skip plans.">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🎬</text></svg>">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    background: #0f172a; color: #e2e8f0;
+    line-height: 1.6; padding: 16px;
+    max-width: 700px; margin: 0 auto;
+  }
+  a { color: #60a5fa; text-decoration: none; }
+  a:hover { text-decoration: underline; }
+  h1 { font-size: 1.4rem; color: #f8fafc; }
+
+  .header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; flex-wrap: wrap; gap: 8px; }
+  .back-btn {
+    background: #475569; color: #fff; border: none; border-radius: 6px;
+    padding: 6px 14px; cursor: pointer; font-size: 0.85rem; font-weight: 600;
+    text-decoration: none;
+  }
+  .back-btn:hover { background: #64748b; text-decoration: none; }
+  .counter { color: #94a3b8; font-size: 0.85rem; }
+
+  .plan-card {
+    background: #1e293b; border-radius: 8px; padding: 16px;
+    margin-bottom: 12px; border: 1px solid #334155;
+    transition: opacity 0.3s;
+  }
+  .plan-card.resolved { opacity: 0.4; }
+  .plan-title { font-weight: 700; color: #f8fafc; font-size: 1rem; margin-bottom: 4px; }
+  .plan-rec {
+    color: #60a5fa; font-size: 0.9rem; margin-bottom: 10px;
+    border-left: 3px solid #3b82f6; padding-left: 10px;
+  }
+  .plan-meta { color: #64748b; font-size: 0.75rem; margin-bottom: 8px; }
+
+  .task-row { display: flex; align-items: flex-start; gap: 8px; margin-bottom: 4px; }
+  .task-check {
+    width: 18px; height: 18px; border-radius: 3px; border: 2px solid #475569;
+    flex-shrink: 0; margin-top: 2px; cursor: pointer; display: flex;
+    align-items: center; justify-content: center; transition: all 0.15s;
+  }
+  .task-check.checked { background: #22c55e; border-color: #22c55e; }
+  .task-check-mark { display: none; color: #fff; font-size: 11px; font-weight: 700; }
+  .task-check.checked .task-check-mark { display: block; }
+  .task-text { font-size: 0.85rem; color: #cbd5e1; flex: 1; }
+  .task-level {
+    font-size: 0.65rem; font-weight: 600; padding: 1px 5px; border-radius: 3px;
+    flex-shrink: 0;
+  }
+  .tl-1 { background: #334155; color: #94a3b8; }
+  .tl-2 { background: #1e3a5f; color: #60a5fa; }
+  .tl-3 { background: #3b1764; color: #a78bfa; }
+
+  .quick-btns { display: flex; gap: 6px; margin: 8px 0 4px; flex-wrap: wrap; }
+  .qb {
+    padding: 3px 8px; border: 1px solid #334155; border-radius: 4px;
+    background: transparent; color: #94a3b8; cursor: pointer; font-size: 0.7rem;
+    transition: all 0.15s;
+  }
+  .qb:hover { border-color: #64748b; color: #e2e8f0; }
+
+  .action-row { display: flex; gap: 8px; margin-top: 10px; align-items: center; }
+  .btn {
+    padding: 8px 18px; border: none; border-radius: 6px; cursor: pointer;
+    font-weight: 600; font-size: 0.85rem; color: #fff; transition: all 0.15s;
+  }
+  .btn:hover { transform: translateY(-1px); box-shadow: 0 2px 8px rgba(0,0,0,0.3); }
+  .btn:disabled { opacity: 0.4; cursor: not-allowed; transform: none; }
+  .btn-approve { background: #22c55e; }
+  .btn-skip { background: #64748b; }
+  .btn-view { background: transparent; border: 1px solid #334155; color: #94a3b8; padding: 8px 12px; }
+  .btn-view:hover { border-color: #64748b; color: #e2e8f0; }
+  .status-msg { color: #94a3b8; font-size: 0.8rem; margin-left: auto; }
+  .spinner {
+    display: inline-block; width: 12px; height: 12px; border: 2px solid rgba(255,255,255,0.3);
+    border-top-color: #fff; border-radius: 50%; animation: spin 0.6s linear infinite;
+    vertical-align: middle; margin-right: 4px;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  .empty-state { color: #64748b; text-align: center; padding: 60px 20px; }
+
+  @media (max-width: 600px) {
+    body { padding: 10px; }
+    .plan-card { padding: 12px; }
+    .action-row { flex-wrap: wrap; }
+    .btn { flex: 1; text-align: center; }
+  }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1>Review Queue</h1>
+  <span class="counter" id="counter"></span>
+  <a href="/" class="back-btn">Dashboard</a>
+</div>
+
+<div id="queue"></div>
+<div class="empty-state" id="empty" style="display:none;">No plans to review. Send some reels!</div>
+
+<script>
+var plans = {{plans_json}};
+
+function render() {
+  var q = document.getElementById('queue');
+  var pending = plans.filter(function(p) { return !p._resolved; });
+  document.getElementById('counter').textContent = pending.length + ' to review';
+  document.getElementById('empty').style.display = plans.length === 0 ? '' : 'none';
+
+  q.innerHTML = plans.map(function(p, pi) {
+    var cls = 'plan-card' + (p._resolved ? ' resolved' : '');
+    var tasks = p.tasks || [];
+    var taskHtml = tasks.map(function(t, ti) {
+      var checked = p._selected && p._selected.has(ti) ? ' checked' : '';
+      var lvl = t.level || 1;
+      return '<div class="task-row">' +
+        '<div class="task-check' + checked + '" onclick="toggleTask(' + pi + ',' + ti + ')">' +
+        '<span class="task-check-mark">&#10003;</span></div>' +
+        '<span class="task-level tl-' + lvl + '">L' + lvl + '</span>' +
+        '<span class="task-text">' + esc(t.title) + ' <span style="color:#64748b">(' + (t.tools||[]).join(', ') + ', ' + t.estimated_hours + 'h)</span></span>' +
+        '</div>';
+    }).join('');
+
+    var statusHtml = p._status ? '<span class="status-msg">' + p._status + '</span>' : '';
+
+    return '<div class="' + cls + '" id="plan-' + pi + '">' +
+      '<div class="plan-title">' + esc(p.title) + '</div>' +
+      '<div class="plan-meta">' + esc(p.category) + ' &middot; ' + (p.relevance_score * 100).toFixed(0) + '% &middot; ' + p.reel_id + '</div>' +
+      '<div class="plan-rec">' + esc(p.recommended_action) + '</div>' +
+      taskHtml +
+      '<div class="quick-btns">' +
+        '<button class="qb" onclick="selectLevel(' + pi + ',1)">L1</button>' +
+        '<button class="qb" onclick="selectLevel(' + pi + ',2)">L1+L2</button>' +
+        '<button class="qb" onclick="selectLevel(' + pi + ',3)">All</button>' +
+        '<button class="qb" onclick="selectNone(' + pi + ')">Clear</button>' +
+      '</div>' +
+      '<div class="action-row">' +
+        '<button class="btn btn-approve" id="approve-' + pi + '" onclick="approve(' + pi + ')">Approve</button>' +
+        '<button class="btn btn-skip" onclick="skip(' + pi + ')">Skip</button>' +
+        '<a class="btn btn-view" href="/plans/' + p.reel_id + '/view" target="_blank">Full plan</a>' +
+        statusHtml +
+      '</div>' +
+    '</div>';
+  }).join('');
+}
+
+function toggleTask(pi, ti) {
+  if (plans[pi]._resolved) return;
+  if (!plans[pi]._selected) plans[pi]._selected = new Set();
+  if (plans[pi]._selected.has(ti)) plans[pi]._selected.delete(ti);
+  else plans[pi]._selected.add(ti);
+  render();
+}
+
+function selectLevel(pi, maxLevel) {
+  if (plans[pi]._resolved) return;
+  plans[pi]._selected = new Set();
+  (plans[pi].tasks || []).forEach(function(t, ti) {
+    if ((t.level || 1) <= maxLevel) plans[pi]._selected.add(ti);
+  });
+  render();
+}
+
+function selectNone(pi) {
+  plans[pi]._selected = new Set();
+  render();
+}
+
+async function approve(pi) {
+  var p = plans[pi];
+  var sel = p._selected ? Array.from(p._selected) : [];
+  if (sel.length === 0) { selectLevel(pi, 2); sel = Array.from(plans[pi]._selected); }
+
+  var btn = document.getElementById('approve-' + pi);
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner"></span>Approving...';
+
+  try {
+    var res = await fetch('/plans/' + p.reel_id + '/approve', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({ selected_tasks: sel, notes: '' }),
+    });
+    if (res.ok) {
+      p._resolved = true;
+      p._status = 'Approved ' + sel.length + ' task(s)';
+    } else {
+      var err = await res.json();
+      p._status = 'Error: ' + (err.detail || res.statusText);
+      btn.disabled = false;
+      btn.textContent = 'Approve';
+    }
+  } catch(e) {
+    p._status = 'Error: ' + e.message;
+    btn.disabled = false;
+    btn.textContent = 'Approve';
+  }
+  render();
+}
+
+async function skip(pi) {
+  var p = plans[pi];
+  try {
+    var res = await fetch('/plans/' + p.reel_id + '/skip', { method: 'POST' });
+    if (res.ok) {
+      p._resolved = true;
+      p._status = 'Skipped';
+    }
+  } catch(e) {}
+  render();
+}
+
+function esc(s) {
+  if (!s) return '';
+  var d = document.createElement('div');
+  d.textContent = s;
+  return d.innerHTML;
+}
+
+render();
+</script>
+</body>
+</html>

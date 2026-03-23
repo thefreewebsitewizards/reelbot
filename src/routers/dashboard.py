@@ -135,6 +135,59 @@ def dashboard():
     return HTMLResponse(html)
 
 
+@router.get("/review", response_class=HTMLResponse)
+def review_queue():
+    """Serve the review queue page — rapid approve/skip for plans in review."""
+    template_path = Path(__file__).resolve().parent.parent.parent / "static" / "review.html"
+    template = template_path.read_text()
+
+    index = get_index()
+    review_plans = [p for p in index.get("plans", []) if p.get("status") == "review"]
+    review_plans.sort(key=lambda p: p.get("created_at", ""), reverse=True)
+
+    # Load task data for each plan
+    plans_with_tasks = []
+    for p in review_plans:
+        plan_json = settings.plans_dir / p["plan_dir"] / "plan.json"
+        tasks = []
+        rec_action = ""
+        category = ""
+        relevance = 0.0
+        if plan_json.exists():
+            try:
+                pd = json.loads(plan_json.read_text())
+                tasks = pd.get("tasks", [])
+                rec_action = pd.get("recommended_action", "")
+                # Read analysis for category/relevance
+                analysis_path = settings.plans_dir / p["plan_dir"] / "analysis.json"
+                if analysis_path.exists():
+                    ad = json.loads(analysis_path.read_text())
+                    category = ad.get("category", "")
+                    relevance = ad.get("relevance_score", 0.0)
+            except (json.JSONDecodeError, OSError):
+                pass
+
+        plans_with_tasks.append({
+            "reel_id": p.get("reel_id", ""),
+            "title": p.get("title", "Untitled"),
+            "recommended_action": rec_action,
+            "category": category,
+            "relevance_score": relevance,
+            "tasks": [
+                {
+                    "title": t.get("title", ""),
+                    "level": t.get("level", 1),
+                    "tools": t.get("tools", []),
+                    "estimated_hours": t.get("estimated_hours", 0),
+                }
+                for t in tasks
+            ],
+        })
+
+    html = template.replace("{{plans_json}}", json.dumps(plans_with_tasks))
+    return HTMLResponse(html)
+
+
 _STEP_COLORS = {
     "analysis": "#3b82f6",
     "similarity": "#f59e0b",
