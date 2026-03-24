@@ -18,7 +18,6 @@ TOPIC_ROUTING = {
     "sales": [
         {"project": "closersim", "folder": "sales-hub", "context": "Master sales knowledge hub — ALL closing techniques, objection handling, discovery, call structure, negotiation. CloserSim is the central repo for sales knowledge."},
         {"project": "tfww", "folder": "sales", "context": "Free website offer sales — closing on video call for free website + hosting upsell"},
-        {"project": "gnomeguys", "folder": "sales", "context": "In-person airport sales — selling Masters merch to private jet travelers"},
         {"project": "aias", "folder": "sales", "context": "AI appointment setting — sales psychology for SMS/iMessage qualification and booking"},
     ],
     "web_design": [
