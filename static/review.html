@@ -280,12 +280,54 @@ function render() {
   }).join('');
 }
 
+function updateCard(pi) {
+  // Targeted update — only touch checkboxes, descriptions, notes, buttons. Never touch iframes.
+  var p = plans[pi];
+  var card = document.getElementById('plan-' + pi);
+  if (!card) return;
+
+  // Update checkboxes
+  var checks = card.querySelectorAll('.task-check');
+  checks.forEach(function(el, ti) {
+    var isChecked = p._selected && p._selected.has(ti);
+    el.className = 'task-check' + (isChecked ? ' checked' : '');
+  });
+
+  // Update description visibility
+  var descs = card.querySelectorAll('.task-desc');
+  descs.forEach(function(el, ti) {
+    var isOpen = p._expanded && p._expanded.has(ti);
+    el.className = 'task-desc' + (isOpen ? ' open' : '');
+  });
+
+  // Update notes
+  var notesEl = document.getElementById('notes-' + pi);
+  if (notesEl) notesEl.style.display = p._notesOpen ? 'block' : 'none';
+
+  // Update resolved state
+  if (p._resolved) card.className = 'plan-card resolved';
+
+  // Update status message
+  var statusEl = card.querySelector('.status-msg');
+  if (p._status && !statusEl) {
+    var actionRow = card.querySelector('.action-row');
+    if (actionRow) {
+      var span = document.createElement('span');
+      span.className = 'status-msg';
+      span.textContent = p._status;
+      actionRow.appendChild(span);
+    }
+  } else if (statusEl && p._status) {
+    statusEl.textContent = p._status;
+  }
+}
+
 function toggleTask(pi, ti) {
   if (plans[pi]._resolved) return;
   if (!plans[pi]._selected) plans[pi]._selected = new Set();
   if (plans[pi]._selected.has(ti)) plans[pi]._selected.delete(ti);
   else plans[pi]._selected.add(ti);
-  render();
+  updateCard(pi);
 }
 
 function selectLevel(pi, maxLevel) {
@@ -294,24 +336,24 @@ function selectLevel(pi, maxLevel) {
   (plans[pi].tasks || []).forEach(function(t, ti) {
     if ((t.level || 1) <= maxLevel) plans[pi]._selected.add(ti);
   });
-  render();
+  updateCard(pi);
 }
 
 function selectNone(pi) {
   plans[pi]._selected = new Set();
-  render();
+  updateCard(pi);
 }
 
 function toggleDesc(pi, ti) {
   if (!plans[pi]._expanded) plans[pi]._expanded = new Set();
   if (plans[pi]._expanded.has(ti)) plans[pi]._expanded.delete(ti);
   else plans[pi]._expanded.add(ti);
-  render();
+  updateCard(pi);
 }
 
 function toggleNotes(pi) {
   plans[pi]._notesOpen = !plans[pi]._notesOpen;
-  render();
+  updateCard(pi);
   if (plans[pi]._notesOpen) {
     var el = document.getElementById('notes-' + pi);
     if (el) { el.focus(); el.selectionStart = el.value.length; }
@@ -348,7 +390,7 @@ async function approve(pi) {
     btn.disabled = false;
     btn.textContent = 'Approve';
   }
-  render();
+  updateCard(pi);
 }
 
 async function redo(pi) {
@@ -356,7 +398,7 @@ async function redo(pi) {
   var notes = p._notes || '';
   if (!notes) {
     plans[pi]._notesOpen = true;
-    render();
+    updateCard(pi);
     var el = document.getElementById('notes-' + pi);
     if (el) { el.focus(); el.placeholder = 'Add notes for what to change, then click Redo again'; }
     return;
@@ -386,7 +428,7 @@ async function redo(pi) {
     btn.disabled = false;
     btn.textContent = 'Redo';
   }
-  render();
+  updateCard(pi);
 }
 
 async function skip(pi) {
@@ -403,7 +445,7 @@ async function skip(pi) {
       p._status = reason ? 'Skipped: ' + reason.substring(0, 40) : 'Skipped';
     }
   } catch(e) {}
-  render();
+  updateCard(pi);
 }
 
 function esc(s) {
