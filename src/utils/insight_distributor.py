@@ -16,9 +16,10 @@ PROJECTS_BASE = Path.home() / "projects" / "openclaw" / "claude-code-projects"
 # Topic → which project folders get insights + sub-folder name
 TOPIC_ROUTING = {
     "sales": [
-        {"project": "closersim", "folder": "sales-hub", "context": "Master sales knowledge hub — ALL closing techniques, objection handling, discovery, call structure, negotiation. CloserSim is the central repo for sales knowledge."},
-        {"project": "tfww", "folder": "sales", "context": "Free website offer sales — closing on video call for free website + hosting upsell"},
-        {"project": "aias", "folder": "sales", "context": "AI appointment setting — sales psychology for SMS/iMessage qualification and booking"},
+        {"project": "closersim", "folder": "sales-hub", "context": "MASTER SALES HUB — receives ALL sales knowledge. AI sales call simulator with NLP personality profiles, 8-dimension scoring, and objection handling drills. Every closing technique, discovery framework, and negotiation pattern goes here to power realistic AI prospect scenarios."},
+        {"project": "aias", "folder": "sales", "context": "B2B HIGH TICKET context — $5k setup + $300/mo AI appointment setter SaaS. Sales via SMS/iMessage AI that qualifies leads, books calls, and follows up. Close happens on video call. Focus: qualification psychology, objection handling over text, urgency without being pushy, enterprise-value framing, 7-touch follow-up sequences."},
+        {"project": "tfww", "folder": "sales", "context": "LOW TICKET context — free website offer, revenue from hosting affiliates. Ads → landing page → AIAS books the call → close on video call. Focus: low-barrier offer framing, building trust fast ('it's actually free'), overcoming 'what's the catch' skepticism, upselling hosting naturally, handling price-sensitive small business owners."},
+        {"project": "gnomeguys", "folder": "sales", "context": "IN-PERSON E-COMMERCE context — selling Masters Tournament merch at a private airport (FBO). Working as baggage assist, building rapport with high net worth private jet travelers, then casually introducing gnome merch. Focus: relationship-first selling, reading buying signals in person, luxury positioning, impulse purchase triggers, handling 'I'll think about it' when they're about to fly out."},
     ],
     "web_design": [
         {"project": "tfww", "folder": "web-design", "context": "Autonomous web design — CSS, layouts, UX, conversion optimization for client websites"},
@@ -41,15 +42,15 @@ TOPIC_ROUTING = {
         {"project": "gnomeguys", "folder": "reel-insights", "context": "E-commerce store (Shopify + Next.js) — product pages, cart optimization, email flows, Shopify tips, conversion optimization"},
     ],
     "appointment_setting": [
-        {"project": "closersim", "folder": "sales-hub", "context": "Appointment setting techniques feed into sales simulator drills and AI prospect scenarios"},
-        {"project": "aias", "folder": "reel-insights", "context": "AI appointment setting via iMessage/SMS — lead qualification, booking, follow-up"},
+        {"project": "closersim", "folder": "sales-hub", "context": "Appointment setting as a sales stage — how to transition from qualification to booked call, urgency techniques, follow-up cadences. Powers realistic AI prospect booking scenarios."},
+        {"project": "aias", "folder": "reel-insights", "context": "AIAS core function — AI handles appointment setting via SMS/iMessage. Qualification questions, booking psychology, no-show recovery, 7-touch angle-varied follow-up. This IS the product."},
     ],
     "funnel": [
-        {"project": "tfww", "folder": "marketing", "context": "Low ticket funnel — ads → landing page → AIAS books → close on video call"},
-        {"project": "aias", "folder": "reel-insights", "context": "High ticket funnel — ads → landing page → AIAS books → close on video call"},
+        {"project": "tfww", "folder": "marketing", "context": "Low ticket funnel — Meta ads → landing page → AIAS books the call → close on video call. Focus: ad creative for free offer, landing page conversion, reducing drop-off between ad click and booked call."},
+        {"project": "aias", "folder": "reel-insights", "context": "High ticket funnel — Meta ads → landing page → AIAS books the call → close on video call. Focus: qualifying high-intent leads, filtering tire-kickers via AI, optimizing the ad-to-appointment pipeline."},
     ],
     "sales_training": [
-        {"project": "closersim", "folder": "sales-hub", "context": "AI sales call simulator — objection handling drills, closing techniques, discovery questions, NLP personality profiles"},
+        {"project": "closersim", "folder": "sales-hub", "context": "Direct input for CloserSim training scenarios — closing frameworks, objection libraries, discovery question banks, NLP techniques, call scoring criteria. Every technique becomes a drill the AI can simulate."},
     ],
     "claude_code": [
         {"project": "claude-upgrades", "folder": "reel-insights", "context": "Claude Code improvements — new skills, prompt engineering, token optimization, MCP management"},
